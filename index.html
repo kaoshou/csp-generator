@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>CSP 產生器</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+      padding: 2em;
+      max-width: 960px;
+      margin: auto;
+    }
+    h1, h2, h3 {
+      color: #333;
+    }
+    .directive {
+      background: #fff;
+      padding: 1em;
+      margin-bottom: 1.5em;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .directive h3 {
+      margin-top: 0;
+    }
+    label {
+      margin-right: 1em;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    input[type="text"] {
+      width: 300px;
+      padding: 5px;
+      margin-top: 5px;
+    }
+    button {
+      margin-left: 0.5em;
+      padding: 6px 14px;
+      background-color: #2c7be5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #1a5fd1;
+    }
+    ul {
+      list-style-type: disc;
+      margin-left: 1.5em;
+      color: #555;
+    }
+    textarea {
+      width: 100%;
+      height: 120px;
+      margin-top: 1em;
+      padding: 10px;
+      font-family: monospace;
+    }
+    .note {
+      font-size: 0.85em;
+      color: #888;
+    }
+    .source-list {
+      margin-top: 0.5em;
+    }
+    span[title] {
+      border-bottom: 1px dotted #aaa;
+      cursor: help;
+    }
+    footer {
+      margin-top: 3em;
+      padding-top: 1em;
+      font-size: 0.9em;
+      color: #666;
+      border-top: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>Content Security Policy (CSP) 產生器</h1>
+  <p><strong>什麼是 CSP？</strong> Content Security Policy 是一種瀏覽器支援的 Web 安全機制，用來限制網站能載入或執行的資源來源，從而降低跨站攻擊（如 XSS）、內容植入、資料竄改等風險。</p>
+  <p><strong>CSP 如何運作？</strong> CSP 透過 HTTP 標頭（Content-Security-Policy）設定。當瀏覽器載入頁面時，會根據指令比對每個資源的來源，若違反政策，瀏覽器會封鎖該資源，並可選擇回報給指定伺服器（例如透過 report-to 或 report-uri）。</p>
+  <p><strong>如何使用本頁面？</strong> 下方列出常見的 CSP 指令，您可以勾選建議的來源選項，或自行輸入欲允許的來源網址。產生後的 CSP 會顯示於下方，可應用於 HTTP 回應標頭中。</p>
+  <p class="note">⚠️ 本工具僅供個人測試用途，對產生內容的正確性、完整性與安全性不提供任何保證。請使用者自行評估並驗證應用於實際環境之適切性。</p>
+
+  <div id="directives-container"></div>
+
+  <button onclick="generateCSP()">🚀 產生 Content-Security-Policy 標頭</button>
+
+  <h2>產生的 Content-Security-Policy 標頭</h2>
+  <textarea id="cspOutput" readonly></textarea>
+
+  <footer>
+     <p>by 鄭郁翰 (Yu-Han Cheng)｜E-mail：<a href="mailto:kaoshou@gmail.com">kaoshou@gmail.com</a></p>
+    <p>
+     本程式碼以
+      <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank">
+        GNU 通用公共授權條款第 3 版（GPL-3.0）
+      </a>
+      授權釋出
+    </p>
+  </footer>
+
+  <script>
+    // 關鍵字說明，提供 tooltip 使用
+    const keywordDescriptions = {
+      "'self'": "僅允許與當前網頁相同來源的資源",
+      "'none'": "完全禁止此類資源的載入",
+      "'unsafe-inline'": "允許行內 script/style，可能導致 XSS 攻擊，請謹慎使用 ⚠️",
+      "'unsafe-eval'": "允許 eval() 或類似方式執行字串程式碼，極高風險 ⚠️",
+      "allow-forms": "允許 iframe 中的表單提交功能",
+      "allow-scripts": "允許 iframe 執行 JavaScript 腳本",
+      "allow-same-origin": "允許 iframe 保持與父頁面相同來源身份，否則為 sandbox 狀態",
+      "'strict-dynamic'": "允許信任的 script 自動載入其他來源的 script，但會忽略其他來源限制，需搭配 nonce 或 hash 使用 ⚠️",
+      "script": "要求 JavaScript 檔案必須使用 Subresource Integrity (SRI)",
+      "style": "要求 CSS 樣式表必須使用 Subresource Integrity (SRI)"};
+
+    // 各 CSP 指令定義，包括說明與建議來源
+    const directives = {
+      "default-src": {
+        label: "default-src",
+        description: "預設資源來源。若其他未明確定義的類別會使用此設定。",
+        options: ["'self'", "'none'"]
+      },
+      // ... 其餘項目保留原樣
+      "script-src": {
+        label: "script-src",
+        description: "允許的 JavaScript 腳本來源。若未指定，則使用 default-src。",
+        options: ["'self'", "'unsafe-inline'", "'unsafe-eval'","'strict-dynamic'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"]
+      },
+      "style-src": {
+        label: "style-src",
+        description: "允許的 CSS 樣式來源，包括樣式表與內嵌 style。",
+        options: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"]
+      },
+      "img-src": {
+        label: "img-src",
+        description: "圖片資源的允許來源，例如 <img>, CSS 背景圖等。",
+        options: ["'self'"]
+      },
+      "media-src": {
+        label: "media-src",
+        description: "音訊、影片等媒體資源的來源。",
+        options: ["'self'"]
+      },
+      "connect-src": {
+        label: "connect-src",
+        description: "允許的網路連線，例如 fetch、XHR、WebSocket 等。",
+        options: ["'self'"]
+      },
+      "font-src": {
+        label: "font-src",
+        description: "字型檔案的來源（如 @font-face）。",
+        options: ["'self'", "https://fonts.gstatic.com"]
+      },
+      "frame-src": {
+        label: "frame-src",
+        description: "允許的 iframe 來源。與 frame-ancestors 搭配可防止點擊劫持。",
+        options: ["'self'", "https://www.youtube.com", "https://www.google.com/maps", "https://www.facebook.com"]
+      },
+      "object-src": {
+        label: "object-src",
+        description: "<span class='note'>控制 &lt;object&gt;, &lt;embed&gt; 等老舊外掛的資源來源。</span> 建議設為 'none'。",
+        options: ["'none'", "'self'"]
+      },
+      "worker-src": {
+        label: "worker-src",
+        description: "允許 Web Worker 與 Service Worker 的來源。",
+        options: ["'self'"]
+      },
+      "base-uri": {
+        label: "base-uri",
+        description: "限制 &lt;base&gt; 標籤指定的 URL 基底來源，以避免網址重寫攻擊。",
+        options: ["'self'", "'none'"]
+      },
+      "sandbox": {
+        label: "sandbox",
+        description: "啟用 CSP 沙箱模式，限制 iframe 中內容行為（如禁止提交表單、執行 script 等）。可加入 allow-forms 等權限子集。",
+        options: ["allow-forms", "allow-scripts", "allow-same-origin"]
+      },
+      "require-sri-for": {
+        label: "require-sri-for",
+        description: "強制特定類型資源（如 script 或 style）使用 Subresource Integrity (SRI)。",
+        options: ["script", "style"]
+      },
+      "report-uri": {
+        label: "report-uri",
+        description: "已逐步淘汰的違規回報機制，仍具相容性，建議與 report-to 搭配使用。",
+        options: []
+      },
+      "report-to": {
+        label: "report-to",
+        description: "CSP 違規事件的現代回報機制，需搭配 Reporting API 的報告端點設定使用。",
+        options: []
+      }
+    };
+
+    const sources = {};
+
+    function init() {
+      const container = document.getElementById('directives-container');
+      for (const dir in directives) {
+        sources[dir] = [];
+        const section = document.createElement('div');
+        section.className = 'directive';
+        const optionCheckboxes = directives[dir].options.map(opt => {
+          const display = keywordDescriptions[opt] ? `<span title="${keywordDescriptions[opt]}">${opt}</span>` : opt;
+          return `<label><input type="checkbox" onchange="toggleSource('${dir}', \`${opt}\`)">${display}</label>`;
+        }).join('');    
+        section.innerHTML = `
+          <h3>${directives[dir].label}</h3>
+          <p class="note">${directives[dir].description}</p>
+          <div>常見來源選項：<br>${optionCheckboxes}</div>
+          <div style="margin-top:10px;">
+            ➕ 自訂來源：
+            <input type="text" id="input-${dir}" placeholder="例如 https://example.com">
+            <button onclick="addCustomSource('${dir}')">新增</button>
+          </div>
+          <ul id="list-${dir}" class="source-list"></ul>
+        `;
+        container.appendChild(section);
+      }
+    }
+
+    function toggleSource(dir, value) {
+      const idx = sources[dir].indexOf(value);
+      if (idx === -1) {
+        sources[dir].push(value);
+      } else {
+        sources[dir].splice(idx, 1);
+      }
+      renderSourceList(dir);
+    }
+
+    function addCustomSource(dir) {
+      const input = document.getElementById('input-' + dir);
+      const val = input.value.trim();
+      if (val && !sources[dir].includes(val)) {
+        sources[dir].push(val);
+        renderSourceList(dir);
+      }
+      input.value = '';
+    }
+
+    function renderSourceList(dir) {
+      const ul = document.getElementById('list-' + dir);
+      ul.innerHTML = sources[dir].map(s => `<li>${s}</li>`).join('');
+    }
+
+    function generateCSP() {
+      let result = [];
+      for (const dir in sources) {
+        if (sources[dir].length > 0) {
+          result.push(`${dir} ${sources[dir].join(' ')}`);
+        }
+      }
+      document.getElementById('cspOutput').value = result.length > 0 ? result.join('; ') + ';' : '';
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
