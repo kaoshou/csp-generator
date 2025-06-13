@@ -50,7 +50,7 @@
 
 by 鄭郁翰 (Yu-Han Cheng)  
 📧 E-mail：<kaoshou@gmail.com>
-
+感謝 ChatGPT 😃
 ---
 
 ## 📜 授權條款
