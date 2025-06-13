@@ -121,9 +121,18 @@
 	  <p><strong>什麼是 CSP？</strong> Content Security Policy 是一種瀏覽器支援的 Web 安全機制，用來限制網站能載入或執行的資源來源，從而降低跨站攻擊（如 XSS）、內容植入、資料竄改等風險。</p>
 	  <p><strong>CSP 如何運作？</strong> CSP 透過 HTTP 標頭（Content-Security-Policy）設定。當瀏覽器載入頁面時，會根據指令比對每個資源的來源，若違反政策，瀏覽器會封鎖該資源，並可選擇回報給指定伺服器（例如透過 report-to 或 report-uri）。</p>
 	  <p><strong>如何使用本頁面？</strong> 下方列出常見的 CSP 指令，您可以勾選建議的來源選項，或自行輸入欲允許的來源網址。產生後的 CSP 會顯示於下方，可應用於 HTTP 回應標頭中。</p>
-	  <p class="note">⚠️ 本工具僅供個人測試用途，對產生內容的正確性、完整性與安全性不提供任何保證。請使用者自行評估並驗證應用於實際環境之適切性。</p>
+	  <p class="note">⚠️ 本工具僅供個人測試用途，對產生內容的正確性、完整性與安全性不提供任何保證。請使用者自行評估並驗證應用於實際環境之適切性。</p>	
 
-	  <div id="directives-container"></div>
+	 <details style="margin-bottom: 2em;">
+	  <summary style="cursor: pointer; font-size: 1.1em; font-weight: bold; margin-bottom: 0.5em;">📥 點此展開並貼上現有的 CSP 設定</summary>
+	  <div style="margin-top: 1em;">
+		<textarea id="cspInput" placeholder="貼上現有的 CSP，例如：default-src 'self'; img-src https://example.com;"></textarea>
+		<button onclick="parseCSP()">⬇️ 解析並載入 CSP</button>
+	  </div>
+	</details>
+
+	<div id="directives-container"></div>
+
 
 	  <button onclick="generateCSP()">🚀 產生 Content-Security-Policy 標頭</button>
 
@@ -131,7 +140,7 @@
 	  <textarea id="cspOutput" readonly></textarea>
 
 	  <footer>
-		 <p>by 鄭郁翰 (Yu-Han Cheng)｜E-mail：<a href="mailto:kaoshou@gmail.com">kaoshou@gmail.com</a></p>
+		 <p>by 鄭郁翰 (Yu-Han Cheng)｜E-mail：<a href="mailto:kaoshou@gmail.com">kaoshou@gmail.com</a> | GitHub(csp-generator)：<a href="https://github.com/kaoshou/csp-generator" target="_blank">https://github.com/kaoshou/csp-generator</a></p>
 		<p>
 		 本程式碼以
 		  <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank">
@@ -175,7 +184,7 @@
 		  "img-src": {
 			label: "img-src",
 			description: "圖片資源的允許來源，例如 <img>, CSS 背景圖等。",
-			options: ["'self'"]
+			options: ["'self'" , "data:"]
 		  },
 		  "media-src": {
 			label: "media-src",
@@ -205,7 +214,7 @@
 		  "worker-src": {
 			label: "worker-src",
 			description: "允許 Web Worker 與 Service Worker 的來源。",
-			options: ["'self'"]
+			options: ["'none'","'self'"]
 		  },
 		  "base-uri": {
 			label: "base-uri",
@@ -294,6 +303,42 @@
 			}
 		  }
 		  document.getElementById('cspOutput').value = result.length > 0 ? result.join('; ') + ';' : '';
+		}
+		function parseCSP() {
+		  const input = document.getElementById('cspInput').value.trim();
+		  if (!input) return;
+
+		  for (const dir in sources) {
+			sources[dir] = [];
+			renderSourceList(dir);
+		  }
+
+		  const directivesList = input.split(';').map(s => s.trim()).filter(Boolean);
+		  directivesList.forEach(item => {
+			const [dir, ...vals] = item.split(/\s+/);
+			if (sources.hasOwnProperty(dir)) {
+			  sources[dir] = vals;
+			  renderSourceList(dir);
+			}
+		  });
+		}
+		function parseCSP() {
+		  const input = document.getElementById('cspInput').value.trim();
+		  if (!input) return;
+
+		  for (const dir in sources) {
+			sources[dir] = [];
+			renderSourceList(dir);
+		  }
+
+		  const directivesList = input.split(';').map(s => s.trim()).filter(Boolean);
+		  directivesList.forEach(item => {
+			const [dir, ...vals] = item.split(/\s+/);
+			if (sources.hasOwnProperty(dir)) {
+			  sources[dir] = vals;
+			  renderSourceList(dir);
+			}
+		  });
 		}
 
 		window.onload = init;
