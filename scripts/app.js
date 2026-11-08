@@ -1,7 +1,7 @@
 /* All imported policy data is rendered as escaped text, never executable markup. */
 (() => {
   'use strict';
-  const C = window.CSPCore, catalog = window.CSPCatalog;
+  const C = window.CSPCore, catalog = window.CSPCatalog, G = window.CSPGuidance;
   const $ = id => document.getElementById(id);
   const escape = value => String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
   const owns = (obj, key) => Object.hasOwn(obj, key);
@@ -9,6 +9,7 @@
   let project = C.createProject(), history = [], future = [], baseline = null;
   let group = '全部', candidate = null, scenarioId = null, hash = '', toastTimer;
   let lastEdit = { key: null, time: 0 }, hasSimulated = false;
+  let selectedRecipe = null, recipeProposal = null;
 
   function toast(message) {
     $('toast').textContent = message;
@@ -49,10 +50,16 @@
     $('rule-count').textContent = Object.keys(project.directives).length + ' 已啟用';
     $('sim-origin').textContent = project.origin;
     $('sim-mode').textContent = observing ? '觀察模式' : '強制模式';
+    $('session-rule-count').textContent = Object.keys(project.directives).length + ' 項';
+    $('session-mode').textContent = observing ? 'Report-Only' : 'Enforce';
+    const errorCount = C.validate(project).filter(issue => issue.level === 'error').length;
+    $('session-checks').textContent = errorCount ? `${errorCount} 項錯誤待修正` : '未發現語法錯誤';
+    $('session-checks').classList.toggle('status-error', errorCount > 0);
     renderOutput();
     renderDiagnostics();
     updateCards();
     renderChanges();
+    renderGuidance();
     if (hasSimulated) simulate();
   }
   function renderOutput() {
@@ -146,7 +153,7 @@
     $('policy-changes').textContent = changes.join('\n') || '規則尚無變更。模式與回報端點請另外確認。';
   }
   function showView(view, focus = false) {
-    if (!['editor', 'simulator', 'rollout', 'learn'].includes(view)) view = 'editor';
+    if (!['editor', 'guidance', 'simulator', 'rollout', 'learn'].includes(view)) view = 'editor';
     document.querySelectorAll('.view').forEach(section => { section.hidden = section.id !== 'view-' + view; });
     document.querySelectorAll('[data-view]').forEach(button => { const active = button.dataset.view === view; button.classList.toggle('active', active); if (active) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current'); });
     if (location.hash !== '#' + view) window.history.replaceState(null, '', '#' + view);
@@ -162,6 +169,54 @@
     $('scenario-impact').textContent = scenario.impact;
     $('scenario-policy').textContent = C.serializePolicy(scenario.directives);
     $('scenario-dialog').showModal();
+  }
+  function renderGuidance() {
+    const labels = { configured: '草稿已設定', review: '需評估', missing: '尚未明列', verify: '待驗證回應' };
+    $('assessment-mode').textContent = project.mode === 'report-only' ? 'REPORT-ONLY 草稿' : 'ENFORCE 草稿';
+    $('baseline-assessment').innerHTML = G.assessBaseline(project).map(row => `<article class="assessment-row"><span class="assessment-symbol ${row.status}" aria-hidden="true">${row.status === 'configured' ? '✓' : row.status === 'missing' ? '−' : '!'}</span><div><strong>${escape(row.title)}</strong><p>${escape(row.message)}</p><a href="${escape(row.reference)}" target="_blank" rel="noopener noreferrer">檢查依據 ↗</a></div><span class="assessment-status ${row.status}">${labels[row.status]}</span></article>`).join('');
+  }
+  function renderRecipeCards() {
+    const query = $('recipe-search').value.trim().toLowerCase();
+    const matches = G.recipes.filter(recipe => `${recipe.title} ${recipe.subtitle} ${recipe.category} ${recipe.description} ${recipe.notes.join(' ')}`.toLowerCase().includes(query));
+    $('recipe-library').innerHTML = matches.map((recipe, i) => `<article class="recipe-card"><div class="recipe-card-top"><span class="recipe-category">${escape(recipe.category)}</span><span class="recipe-index" aria-hidden="true">${String(i + 1).padStart(2, '0')}</span></div><h4>${escape(recipe.title)}</h4><p class="recipe-subtitle">${escape(recipe.subtitle)}</p><p>${escape(recipe.description)}</p><button class="recipe-button" data-recipe="${recipe.id}">預覽調整 <span aria-hidden="true">→</span></button></article>`).join('');
+    $('no-recipes').hidden = matches.length > 0;
+  }
+  function openRecipe(id) {
+    selectedRecipe = G.recipes.find(recipe => recipe.id === id);
+    if (!selectedRecipe) return;
+    $('recipe-title').textContent = selectedRecipe.title;
+    $('recipe-category').textContent = selectedRecipe.category;
+    $('recipe-description').textContent = selectedRecipe.description;
+    $('recipe-url-field').hidden = $('recipe-url-help').hidden = !selectedRecipe.input;
+    $('recipe-url').value = '';
+    $('recipe-url').placeholder = selectedRecipe.placeholder || '';
+    $('recipe-reference').href = selectedRecipe.source;
+    previewRecipe();
+    $('recipe-dialog').showModal();
+    if (selectedRecipe.input) $('recipe-url').focus();
+  }
+  function previewRecipe() {
+    recipeProposal = null;
+    $('apply-recipe').disabled = true;
+    const box = $('recipe-preview');
+    box.className = 'recipe-preview';
+    let notes = selectedRecipe.notes;
+    try {
+      if (selectedRecipe.input && !$('recipe-url').value.trim()) {
+        box.textContent = '填入實際 URL 後，就能預覽將加入的來源。';
+      } else {
+        recipeProposal = G.proposeRecipe(project, selectedRecipe.id, { url: $('recipe-url').value });
+        notes = recipeProposal.notes;
+        if (recipeProposal.conflicts.length) {
+          box.classList.add('conflict'); box.textContent = recipeProposal.conflicts.join(' ');
+        } else if (!recipeProposal.changes.length) box.textContent = '目前政策已包含這項調整，不需要重複加入。';
+        else {
+          box.innerHTML = `<strong>將調整 ${recipeProposal.changes.length} 項指令</strong><div class="recipe-diff">${recipeProposal.changes.map(change => `<div><code class="diff-before">− ${escape(change.name)} ${change.before === null ? '（原本未明列）' : escape(change.before.join(' ') || '（空清單）')}</code><code class="diff-after">+ ${escape(change.name)} ${escape(change.after.join(' '))};</code></div>`).join('')}</div>`;
+          $('apply-recipe').disabled = false;
+        }
+      }
+    } catch (error) { box.classList.add('conflict'); box.textContent = error.message; }
+    $('recipe-notes').innerHTML = notes.map(note => `<li>${escape(note)}</li>`).join('');
   }
   function invalidateImport() {
     candidate = null;
@@ -228,8 +283,15 @@
     if (button.dataset.action === 'download-project') download(C.exportProject(project), fileStem() + '.csp.json', true);
     if (button.dataset.action === 'jump-output') { $('policy-output').scrollIntoView({ block: 'center' }); $('policy-output').focus({ preventScroll: true }); }
     if (button.dataset.close) $(button.dataset.close).close();
-    if (button.dataset.view || button.dataset.go) { event.preventDefault(); showView(button.dataset.view || button.dataset.go, !!button.dataset.go); }
+    if (button.dataset.view || button.dataset.go) { event.preventDefault(); showView(button.dataset.view || button.dataset.go, true); }
     if (button.dataset.scenario) chooseScenario(button.dataset.scenario);
+    if (button.dataset.recipe) openRecipe(button.dataset.recipe);
+    if (button.dataset.action === 'open-hash') {
+      showView('editor');
+      document.querySelector('.advanced-panel details').open = true;
+      $('hash-target').value = owns(project.directives, 'script-src-elem') ? 'script-src-elem' : 'script-src';
+      $('hash-content').scrollIntoView({ block: 'center' }); $('hash-content').focus({ preventScroll: true });
+    }
     if (button.dataset.mode) commit(p => { p.mode = button.dataset.mode; });
     if (button.dataset.group) {
       group = button.dataset.group;
@@ -257,6 +319,15 @@
   $('project-origin').addEventListener('input', event => commit(p => { p.origin = event.target.value.trim(); }, 'origin'));
   $('reporting-endpoint').addEventListener('input', event => commit(p => { p.reportingEndpoint = event.target.value.trim(); }, 'reporting'));
   $('rule-search').addEventListener('input', updateCards);
+  $('recipe-search').addEventListener('input', renderRecipeCards);
+  $('recipe-url').addEventListener('input', previewRecipe);
+  $('apply-recipe').addEventListener('click', () => {
+    if (!recipeProposal || recipeProposal.conflicts.length || !recipeProposal.changes.length) return;
+    const next = C.clone(recipeProposal.project);
+    commit(p => Object.assign(p, next));
+    $('recipe-dialog').close(); recipeProposal = null;
+    renderRules(); showView('editor', true); toast('已加入整合所需來源，保留其餘設定；可使用復原還原。');
+  });
   $('enabled-only').addEventListener('change', updateCards);
   $('directives').addEventListener('change', event => {
     if (event.target.dataset.enable) {
@@ -301,9 +372,11 @@
   $('load-local').addEventListener('click', () => { try { $('import-text').value = localStorage.getItem(storageKey) || ''; $('import-dialog').showModal(); previewImport(); } catch { toast('讀取本機草稿失敗，請改用 JSON 備份。'); } });
   $('clear-local').addEventListener('click', () => { try { localStorage.removeItem(storageKey); refreshStorage(); toast('已刪除瀏覽器中的草稿，目前編輯內容仍保留。'); } catch { toast('無法存取瀏覽器儲存空間。'); } });
   $('hash-content').addEventListener('input', () => { hash = ''; $('hash-result').textContent = ''; $('add-hash').disabled = true; });
+  $('hash-algorithm').addEventListener('change', () => { hash = ''; $('hash-result').textContent = ''; $('add-hash').disabled = true; });
   $('calculate-hash').addEventListener('click', async () => {
     const text = $('hash-content').value;
-    try { const value = await C.hashSource(text); if (text !== $('hash-content').value) return; hash = value; $('hash-result').textContent = value; $('add-hash').disabled = false; }
+    const algorithm = $('hash-algorithm').value;
+    try { const value = await C.hashSource(text, algorithm); if (text !== $('hash-content').value || algorithm !== $('hash-algorithm').value) return; hash = value; $('hash-result').textContent = value; $('add-hash').disabled = false; }
     catch (error) { toast(error.message); }
   });
   $('add-hash').addEventListener('click', () => { if (!hash) return; const name = $('hash-target').value; commit(p => { p.directives[name] = [...new Set([...(p.directives[name] || []).filter(v => v !== "'none'"), hash])]; }); toast('已將 hash 加入 ' + name + '。'); });
@@ -312,5 +385,6 @@
   $('sim-kind').addEventListener('change', syncSimulationKind);
   for (const id of ['sim-url', 'sim-nonce', 'sim-hash', 'sim-dynamic']) $(id).addEventListener('input', () => { if (hasSimulated) simulate(); });
   window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
-  renderRules(true); renderDerived(); refreshStorage(); showView(location.hash.slice(1));
+  $('baseline-snippet').textContent = C.serializePolicy(C.createProject('baseline').directives).split('; ').join(';\n');
+  renderRecipeCards(); renderRules(true); renderDerived(); refreshStorage(); showView(location.hash.slice(1));
 })();

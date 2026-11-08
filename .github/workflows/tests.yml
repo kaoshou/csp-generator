@@ -16,3 +16,5 @@ jobs:
       - run: node --check scripts/app.js
       - run: node --check scripts/core.js
       - run: node --check scripts/catalog.js
+      - run: node --check scripts/guidance.js
+      - run: node --check tests/browser.js

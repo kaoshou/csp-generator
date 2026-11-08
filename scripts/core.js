@@ -255,10 +255,11 @@
     if (status === 'allowed' && ['frame-ancestors', 'form-action', 'worker-src'].includes(type)) return done('unknown', '單一 URL 符合來源規則；完整祖先鏈、重新導向、Worker 同源條件等仍需瀏覽器驗證。');
     return done(status, reason);
   }
-  async function hashSource(text) {
+  async function hashSource(text, algorithm = 'SHA-256') {
+    if (!['SHA-256', 'SHA-384', 'SHA-512'].includes(algorithm)) throw new Error('只支援 SHA-256、SHA-384 與 SHA-512。');
     if (!globalThis.crypto?.subtle) throw new Error('此環境不支援 Web Crypto；請以 HTTPS 或 localhost 開啟。');
-    const hash = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-    return "'sha256-" + btoa(String.fromCharCode(...new Uint8Array(hash))) + "'";
+    const hash = await globalThis.crypto.subtle.digest(algorithm, new TextEncoder().encode(text));
+    return "'" + algorithm.toLowerCase().replace('-', '') + '-' + btoa(String.fromCharCode(...new Uint8Array(hash))) + "'";
   }
   return { createProject, parsePolicy, serializePolicy, importProject, exportProject, effectiveDirective, validOrigin, validate, exportConfig, clone, simulate, hashSource };
 });

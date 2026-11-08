@@ -33,6 +33,7 @@
   ];
   const base = { 'default-src': ["'self'"], 'script-src': ["'self'"], 'style-src': ["'self'"], 'img-src': ["'self'"], 'connect-src': ["'self'"], 'object-src': ["'none'"], 'base-uri': ["'self'"], 'frame-ancestors': ["'none'"], 'form-action': ["'self'"] };
   const scenarios = [
+    { id: 'baseline', icon: '00', name: '一般網站建議基線', tag: '常見弱掃檢查', description: '從明確的資源與邊界限制開始，再逐項開放實際需求。', impact: '這是同源網站的起點，不是通過所有掃描的保證。預設不允許 iframe、行內腳本／事件與行內樣式；第三方服務、跨站表單與 API 需依指南調整。來源白名單仍可能被繞過，較高防護需求應採 nonce/hash 嚴格政策。', directives: { ...base, 'script-src-attr': ["'none'"], 'frame-src': ["'none'"] } },
     { id: 'static', icon: '01', name: '靜態網站', tag: '從簡單開始', description: '部落格、文件、形象網站，資源以同源為主。', impact: '行內腳本與樣式將不符合政策；請外移檔案或使用 hash。外站圖片需另行開放。', directives: base },
     { id: 'app', icon: '02', name: '前後端分離', tag: 'API / SPA', description: '有登入、API 或即時連線的網頁應用程式。', impact: '請把 api.example.com 換成真正的 API origin；WebSocket 另加 wss://。前端框架行內樣式需測試。', directives: { ...base, 'connect-src': ["'self'", 'https://api.example.com'], 'worker-src': ["'self'"], 'manifest-src': ["'self'"] } },
     { id: 'embed', icon: '03', name: '第三方內容', tag: '字型 / 影片', description: '示範如何為遠端字型、圖片與影片分別授權。', impact: '範例允許 Google Fonts 與 YouTube 隱私加強嵌入；並非任何第三方服務的完整相依清單。', directives: { ...base, 'style-src': ["'self'", 'https://fonts.googleapis.com'], 'font-src': ["'self'", 'https://fonts.gstatic.com'], 'frame-src': ['https://www.youtube-nocookie.com'], 'img-src': ["'self'", 'data:'] } },

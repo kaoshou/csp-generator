@@ -1,5 +1,22 @@
 # CSP 工作台驗證紀錄
 
+## 2.1.0 建議基線與整合指南
+
+2026-11-09，本機驗證完成：
+
+- Node 原生回歸 **43 項通過、0 失敗**；app/core/catalog/guidance/browser-test 腳本語法檢查與 diff 空白檢查通過。
+- `tests/browser.html` 的 **15 組真實瀏覽器回歸通過、0 失敗**：包含基線、預覽/套用/復原/重做、元素 CDN 規則、錯誤 URL、JSON 往返、未知/空指令、File.text/DataTransfer 匯入、過大檔案、多重政策拒絕、本機草稿、HTML 文字跳脫、SHA-256/384/512、模擬、六種輸出與 strict-dynamic 衝突。
+- 另外透過瀏覽器 UI 逐一驗證 10 種整合，來源、metadata 與未修改指令保持正確。CDN query/fragment 不進入來源規則；不放寬 script-src-attr 或 default-src。
+- 獨立檢視發現並補測：fallback 中不適用的執行關鍵字、萬用來源及不支援的主機語法。另以瀏覽器重現 URL 主機字元正規化差異，修正後拒絕明文與 percent-encoded 萬用主機。
+- 320px、390px 手機與 768px 平板檢查無頁面水平溢出；長 URL 的預覽對話框已修正換行，對話框 scrollWidth 等於 clientWidth。恢復測試時的 viewport 覆寫。
+- 實際點擊複製，再 Ctrl+V 貼回匯入欄位，確認政策標頭正確。實際下載 `csp-local-validation-20261109.csp.json`，檔案解析為完整 version-1、Report-Only 專案。
+- 檔案匯入已使用瀏覽器原生 File、DataTransfer 與實際 change handler 驗證；未要求擴大擴充功能的檔案系統權限，未使用作業系統檔案選擇對話框。這與下方 2.0 時尚未完成的程式路徑驗證有所不同。
+- 測試與 docs 透過 `_config.yml` 排除於正式 Pages 輸出。資產版本參數為 `2.1.0`。
+
+以上是工具功能與本機來源規則驗證，不是目標網站的弱掃或真實 Google/CDN 服務相容性保證。指南本身不主動載入第三方服務；實際整合仍需依需求、官方文件與完整頁面流程驗證。
+
+## 2.0 開發紀錄（保留歷史）
+
 日期：2026-11-09。環境：Windows、Node.js 24.14.0、Google Chrome，本機 loopback 開發伺服器。
 
 ## 自動檢查

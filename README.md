@@ -7,6 +7,8 @@
 ## 可以做什麼
 
 - **從需求開始**：靜態網站、前後端分離、第三方字型／影片、nonce 嚴格政策，以及從全部封鎖開始的課堂練習。套用前顯示可能影響，不會自動掃描或修改網站。
+- **一般網站建議基線**：另提供明確的外掛、表單、基底網址、嵌入邊界與行內事件限制，搭配 9 組常見弱掃項目對照。草稿狀態與實際 HTTP 部署分開判斷，不宣稱通過所有掃描器。
+- **常見整合指南**：YouTube 一般／隱私加強 iframe、Google Maps iframe、Google Fonts、指定 JS/CSS CDN、API、WebSocket、blob 圖片預覽與合作站嵌入，共 10 種可預覽調整。只加入需要的來源，保留其他政策與模式；可復原。另說明 Maps JavaScript API 的 nonce、載入鏈與相容性需求。
 - **理解再設定**：25 項指令的用途、可能副作用與適合情境；顯示目前有效的 fallback；支援搜尋、分類與只看已啟用。
 - **可靠的重新編輯**：匯入純 CSP、單一完整 HTTP 標頭、對應 Reporting-Endpoints，或版本化 JSON 專案。先解析預覽再套用，並可復原／重做。
 - **保留原政策**：未知與過時指令不會無聲遺失，無參數 `sandbox`、`upgrade-insecure-requests` 與空來源清單也能保留。重複指令依瀏覽器採第一個並提出提醒。
@@ -14,7 +16,7 @@
 - **六種輸出**：HTTP 回應標頭、純政策值、Nginx、Apache、HTML meta、JSON 專案，可複製或下載。meta 不支援的功能會明確阻止輸出。
 - **理解預期結果**：模擬 URL、行內內容、nonce/hash 與 eval，說明命中的來源規則和觀察模式差異。超出模型範圍時明確提示實測。
 - **部署與教學**：備份、觀察、流程驗證、逐步強制、回復方案、故障對照表、基本觀念與課堂練習。
-- **本機資料**：SHA-256 內容雜湊、明確選擇的瀏覽器草稿與 JSON 備份。無追蹤、外部字型、後端或執行期套件。
+- **本機資料**：SHA-256／SHA-384／SHA-512 內容雜湊、明確選擇的瀏覽器草稿與 JSON 備份。無追蹤、外部字型、後端或執行期套件。
 
 ## 使用流程
 
@@ -48,9 +50,11 @@ node --check scripts/catalog.js
 
 自動測試涵蓋匯入／輸出往返、JSON 格式、重複／空指令、CSP fallback、來源／路徑／連接埠匹配、行內腳本、hash、sandbox 與伺服器輸出字元處理。瀏覽器驗證紀錄見 [docs/verification.md](docs/verification.md)。
 
+啟動本機伺服器後，開啟 <http://127.0.0.1:4173/tests/browser.html> 執行 15 組瀏覽器回歸測試，涵蓋真實瀏覽器 File／DataTransfer、UI 事件與非同步雜湊；僅操作 iframe 中產生的測試資料，不選取本機檔案。`_config.yml` 將測試與開發文件排除於 GitHub Pages 正式輸出。
+
 ## 部署這個工具
 
-保留 `index.html`、`styles.css`、`scripts/catalog.js`、`scripts/core.js`、`scripts/app.js` 與 `assets/` 的相對路徑，直接部署靜態檔案即可。原有 GitHub Pages 可繼續使用根目錄，`CNAME` 保留 `csp.yuhan.tw`。不需要註冊服務或設定密鑰。
+保留 `index.html`、`styles.css`、`scripts/catalog.js`、`scripts/core.js`、`scripts/guidance.js`、`scripts/app.js` 與 `assets/` 的相對路徑，直接部署靜態檔案即可。原有 GitHub Pages 使用 `main` 根目錄，`CNAME` 保留 `csp.yuhan.tw`。不需要註冊服務或設定密鑰。HTML 的資產版本參數避免不同版本的腳本被快取混用。
 
 工具自己使用外部同源 CSS/JS，沒有行內事件處理器。若替工具加上 CSP，需在實際主機設定回應標頭；GitHub Pages 不提供在 repository 檔案中自訂任意 HTTP 回應標頭的能力，需由支援的代理或主機處理。不要將產生的待測政策直接套在工具自身頁面上。
 
@@ -71,9 +75,12 @@ index.html            介面、教學與部署說明
 styles.css            響應式樣式、鍵盤焦點與列印樣式
 scripts/catalog.js    指令解說與情境資料
 scripts/core.js       純政策解析、檢查、輸出與模擬
+scripts/guidance.js   建議基線對照、整合指南與不改寫原稿的差異提案
 scripts/app.js        介面、操作歷史、匯入預覽與本機檔案
 scripts/serve.cjs     僅供開發的本機伺服器
 tests/core.test.cjs   Node 原生回歸測試
+tests/guidance.test.cjs 整合來源、回退、URL 與基線判斷回歸測試
+tests/browser.html   本機瀏覽器回歸測試入口（正式部署排除）
 ```
 
 ## 參考資料
@@ -86,6 +93,10 @@ tests/core.test.cjs   Node 原生回歸測試
 - [Apache mod_headers](https://httpd.apache.org/docs/2.4/mod/mod_headers.html#header)
 - [Nginx headers module](https://nginx.org/en/docs/http/ngx_http_headers_module.html)
 - [Google CSP Evaluator](https://csp-evaluator.withgoogle.com/)（外部服務，不會由本工具自動傳送政策）
+- [ZAP CSP 檢查項目](https://www.zaproxy.org/docs/alerts/10055/) 與 [CSP 標頭缺失／Report-Only 檢查](https://www.zaproxy.org/docs/alerts/10038/)
+- [Google Maps Embed API](https://developers.google.com/maps/documentation/embed/embedding-map) 與 [Maps JS API 的 CSP 指南](https://developers.google.com/maps/documentation/javascript/content-security-policy)
+- [YouTube 嵌入說明](https://support.google.com/youtube/answer/171780) 與 [Player API 參數](https://developers.google.com/youtube/player_parameters)
+- [OWASP HTTP 標頭指南](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html)
 
 ## 作者與授權
 

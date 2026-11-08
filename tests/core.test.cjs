@@ -122,6 +122,14 @@ test('sha256 uses exact UTF-8 contents including whitespace', async () => {
   assert.equal(await c.hashSource('hello'), "'sha256-LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ='");
   assert.notEqual(await c.hashSource('hello '), await c.hashSource('hello'));
 });
+test('hash tool supports SHA-384 and SHA-512 as valid CSP hash sources',async()=>{
+  const {createHash}=require('node:crypto');
+  for(const algorithm of ['SHA-384','SHA-512']){
+    const expected="'"+algorithm.toLowerCase().replace('-','')+'-'+createHash(algorithm.toLowerCase().replace('-','')).update('hello').digest('base64')+"'";
+    assert.equal(await c.hashSource('hello',algorithm),expected);
+  }
+  await assert.rejects(c.hashSource('hello','MD5'),/SHA/);
+});
 test('exported HTTP headers with Reporting-Endpoints can be pasted back without loss', () => {
   const p = c.createProject('static');
   p.directives['report-to'] = ['csp'];
