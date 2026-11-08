@@ -1,0 +1,6 @@
+# Keep development and verification material outside the GitHub Pages output.
+exclude:
+  - tests
+  - docs
+  - package.json
+  - scripts/serve.cjs
