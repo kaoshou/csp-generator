@@ -1,415 +1,89 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
-   <head>
-      <meta charset="UTF-8">
-      <title>CSP 產生器</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-      body {
-      font-size: 1rem;
-      font-family: Arial, sans-serif;
-      background: #f9f9f9;
-      padding: 2em;
-      max-width: 960px;
-      margin: auto;
-    }
-    h1, h2, h3 {
-      color: #333;
-    }
-    .description {
-      background-color: #eaf4ff;
-      padding: 1.5em;
-      border-left: 5px solid #2c7be5;
-      margin-bottom: 2em;
-      border-radius: 6px;
-    }
-    .description p {
-      margin: 0.5em 0;
-      line-height: 1.6;
-    }
-    .csp-input-wrapper {
-      background: #fff;
-      padding: 1em;
-      border-radius: 10px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      margin-bottom: 2em;
-    }
-    .csp-input-wrapper textarea {
-      font-size: 1rem;
-      width: 100%;
-      height: 100px;
-      margin-top: 1em;
-      padding: 10px;
-      box-sizing: border-box;
-      font-family: monospace;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      resize: vertical;
-    }
-    .csp-input-wrapper button {
-      margin-top: 0.8em;
-    }
-    .directive {
-      background: #fff;
-      padding: 1em;
-      margin-bottom: 1.5em;
-      border-radius: 10px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .directive h3 {
-      margin-top: 0;
-    }
-    label {
-      font-size: 1rem;
-      margin-right: 1em;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      line-height: 1.5;
-    }
-    input[type="text"] {
-      font-size: 1rem;
-      width: 100%;
-      max-width: 300px;
-      box-sizing: border-box;
-      padding: 5px;
-      margin-top: 5px;
-    }
-    button {
-      font-size: 1rem;
-      margin-left: 0.5em;
-      padding: 6px 14px;
-      background-color: #2c7be5;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      max-width: 100%;
-    }
-    button:hover {
-      background-color: #1a5fd1;
-    }
-    ul {
-      list-style-type: disc;
-      margin-left: 1.5em;
-      color: #555;
-    }
-    .result-box {
-      position: relative;
-      background: #fff;
-      border: 1px solid #ccc;
-      padding: 0;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-      overflow: hidden;
-      margin-bottom: 2em;
-    }
-    .result-box textarea {
-      font-size: 1rem;
-      width: 100%;
-      height: 160px;
-      padding: 10px;
-      border: none;
-      resize: none;
-      font-family: monospace;
-      box-sizing: border-box;
-      outline: none;
-      border-radius: 8px;
-    }
-    .copy-button {
-      position: absolute;
-      bottom: 10px;
-      right: 10px;
-      background: #2c7be5;
-      color: white;
-      border: none;
-      padding: 6px 14px;
-      font-size: 0.9rem;
-      border-radius: 6px;
-      cursor: pointer;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-      opacity: 0.9;
-      transition: background 0.3s ease;
-    }
-    .copy-button:hover {
-      background-color: #1a5fd1;
-      opacity: 1;
-    }
-    .note {
-      font-size: 0.85em;
-      color: #888;
-    }
-    .source-list {
-      margin-top: 0.5em;
-    }
-    span[title] {
-      border-bottom: 1px dotted #aaa;
-      cursor: help;
-    }
-    footer {
-      margin-top: 3em;
-      padding-top: 1em;
-      font-size: 0.9em;
-      color: #444;
-      border-top: 1px solid #ccc;
-      background: #f0f0f0;
-      border-radius: 8px;
-      padding: 1.5em;
-      line-height: 1.6;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    }
-    footer a {
-      color: #2c7be5;
-      text-decoration: none;
-    }
-    footer a:hover {
-      text-decoration: underline;
-    }
-    @media (max-width: 600px) {
-      body {
-        padding: 1em;
-      }
-      .directive {
-        padding: 0.75em;
-      }
-      .result-box textarea {
-        height: 140px;
-      }
-      .copy-button {
-        position: static;
-        margin-top: 0.5em;
-        width: 100%;
-        border-radius: 0 0 8px 8px;
-      }
-    }
-      </style>
-   </head>
-   <body>
-      <h1>Content Security Policy (CSP) 產生器</h1>
-      <div class="description">
-         <p><strong>什麼是 CSP？</strong> Content Security Policy 是一種瀏覽器支援的 Web 安全機制，用來限制網站能載入或執行的資源來源，從而降低跨站攻擊（如 XSS）、內容植入、資料竄改等風險。</p>
-         <p><strong>CSP 如何運作？</strong> CSP 透過 HTTP 標頭（Content-Security-Policy）設定。當瀏覽器載入頁面時，會根據指令比對每個資源的來源，若違反政策，瀏覽器會封鎖該資源，並可選擇回報給指定伺服器（例如透過 report-to 或 report-uri）。</p>
-         <p><strong>如何使用本頁面？</strong> 下方列出常見的 CSP 指令，您可以勾選建議的來源選項，或自行輸入欲允許的來源網址。產生後的 CSP 會顯示於下方，可應用於 HTTP 回應標頭中。</p>
-         <p class="note">📘 本功能主要用於資訊安全教育訓練之用，除了本頁列出的指令，更多 CSP 進階設定，請參考 W3C 文件：<a href="https://www.w3.org/TR/CSP/" target="_blank">https://www.w3.org/TR/CSP/</a></p>
-         <p class="note">⚠️ 本工具僅供個人測試用途，對產生內容的正確性、完整性與安全性不提供任何保證。請使用者自行評估並驗證應用於實際環境之適切性。</p>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="從使用情境建立 Content Security Policy。理解設定影響、模擬資源規則，匯入與匯出可重新編輯的 CSP 政策。">
+  <meta name="color-scheme" content="light">
+  <title>CSP 工作台｜建立政策，也理解影響</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="scripts/catalog.js"></script>
+  <script defer src="scripts/core.js"></script>
+  <script defer src="scripts/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">跳至主要內容</a>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="CSP 工作台首頁"><span class="brand-mark" aria-hidden="true">{<span>✓</span>}</span><span>CSP <b>工作台</b><small>CONTENT SECURITY POLICY</small></span></a>
+    <div class="header-actions"><span class="local-label"><i></i> 純本機處理</span><button class="button subtle" data-action="open-import"><span aria-hidden="true">↥</span> 匯入政策</button><button class="button dark" data-action="download-project">儲存專案 <span aria-hidden="true">↓</span></button></div>
+  </header>
+  <main id="main" class="shell">
+    <section class="hero" aria-labelledby="hero-title">
+      <div><p class="eyebrow">BUILD WITH UNDERSTANDING</p><h1 id="hero-title">建立 CSP，<span>也理解每一項影響。</span></h1><p class="hero-description">從「網站需要什麼」開始，把安全規則變成看得懂、能驗證、可持續編輯的政策。</p></div>
+      <div class="hero-note"><span class="mini-shield" aria-hidden="true">✓</span><div><strong>先觀察，再啟用防護</strong><p>預設 Report-Only，逐步找出相容性問題。</p></div></div>
+    </section>
+    <nav class="workspace-nav" aria-label="工作區">
+      <button class="nav-button active" data-view="editor" aria-current="page"><span>01</span> 建立政策</button>
+      <button class="nav-button" data-view="simulator"><span>02</span> 模擬與檢查</button>
+      <button class="nav-button" data-view="rollout"><span>03</span> 安全上線</button>
+      <button class="nav-button" data-view="learn"><span aria-hidden="true">▤</span> 學習指南</button>
+    </nav>
+    <section id="view-editor" class="view" aria-label="建立政策">
+      <details class="scenario-section" open>
+        <summary><span><span class="eyebrow">START FROM A SCENARIO</span><strong>不知道怎麼設定？從你的使用情境開始</strong></span><span class="summary-hint">選一個起點，再依網站調整 <span aria-hidden="true">⌄</span></span></summary>
+        <div id="scenario-cards" class="scenario-grid"></div>
+        <p class="section-footnote">情境是可修改的範例，不會自動偵測你的網站。已有設定？直接<a href="#" data-action="open-import">匯入現有政策</a>。</p>
+      </details>
+      <button class="button subtle mobile-output-jump" data-action="jump-output">查看即時政策與檢查結果 ↓</button>
+      <div class="workspace-grid">
+        <div class="editor-column">
+          <section class="panel settings-panel" aria-labelledby="settings-heading">
+            <div class="panel-heading"><h2 id="settings-heading">政策設定</h2><span class="badge neutral">本機草稿</span></div>
+            <div class="field-grid"><label>專案名稱<input id="project-name" maxlength="120" autocomplete="off"></label><label>受保護的網站來源 <span class="field-note">用於模擬 self</span><input id="project-origin" type="url" placeholder="https://example.com" spellcheck="false" aria-describedby="origin-help"></label></div>
+            <p id="origin-help" class="field-help">來源 = 協定 + 網域 + 連接埠，不含路徑。這不會設定或掃描該網站。</p>
+            <div class="mode-row"><div><strong>政策模式</strong><p id="mode-help"></p></div><div class="mode-control" role="group" aria-label="政策模式"><button data-mode="report-only">觀察模式</button><button data-mode="enforce">強制模式</button></div></div>
+          </section>
+          <section aria-labelledby="directives-heading" class="rules-section">
+            <div class="rules-heading"><div><h2 id="directives-heading">資源與行為規則 <span id="rule-count" class="count"></span></h2><p>展開規則，了解用途與可能影響。</p></div><div class="history-actions"><button id="undo" class="icon-button" title="復原" aria-label="復原">↶</button><button id="redo" class="icon-button" title="重做" aria-label="重做">↷</button></div></div>
+            <div class="filter-toolbar"><label class="search-field"><span aria-hidden="true">⌕</span><input id="rule-search" type="search" placeholder="搜尋指令、用途或關鍵字" aria-label="搜尋規則"></label><label class="check-label"><input id="enabled-only" type="checkbox"> 只看已啟用</label></div>
+            <div id="rule-filters" class="filter-tabs" role="group" aria-label="規則分類"></div>
+            <div id="directives"></div><p id="no-rules" class="empty-state" hidden>找不到符合的規則，請換個關鍵字或分類。</p>
+          </section>
+          <section class="panel advanced-panel"><details><summary><strong>回報端點與輔助工具</strong><span aria-hidden="true">＋</span></summary><div class="details-body"><label>Reporting-Endpoints 的 HTTPS 接收端點<input id="reporting-endpoint" type="url" placeholder="https://reports.your-domain.com/csp" spellcheck="false"></label><p class="field-help">需另外啟用 report-to 並填入群組名稱（如 csp）。本工具只產生設定，不提供接收服務。</p><hr><h3>行內內容 SHA-256</h3><p class="field-help">只貼 script/style 標籤內的原始內容，不含標籤。空白與換行會影響 hash；計算時不會執行內容。</p><label class="sr-only" for="hash-content">要計算雜湊的原始內容</label><textarea id="hash-content" rows="4" spellcheck="false" placeholder="console.log('hello');"></textarea><div class="inline-actions"><button class="button subtle" id="calculate-hash">計算 SHA-256</button><label class="sr-only" for="hash-target">加入哪個指令</label><select id="hash-target"><option>script-src</option><option>script-src-elem</option><option>style-src</option><option>style-src-elem</option></select><button class="button subtle" id="add-hash" disabled>加入規則</button></div><output id="hash-result" class="hash-result"></output></div></details></section>
+          <div class="local-save-row"><span>需要下次繼續？</span><button class="text-button" id="save-local">儲存在此瀏覽器</button><button class="text-button" id="load-local" hidden>載入本機草稿</button><button class="text-button" id="clear-local" hidden>刪除本機草稿</button></div>
+        </div>
+        <aside class="output-column" aria-label="政策輸出與診斷">
+          <section class="output-panel"><div class="output-heading"><div><p class="eyebrow">YOUR POLICY</p><h2>即時政策輸出</h2></div><span id="output-mode" class="badge"></span></div><label class="output-select-label" for="output-format">輸出格式</label><select id="output-format"><option value="header">HTTP 回應標頭</option><option value="raw">純 CSP 政策值</option><option value="nginx">Nginx 設定</option><option value="apache">Apache 設定</option><option value="meta">HTML meta</option><option value="json">JSON 專案（可重新編輯）</option></select><label class="sr-only" for="policy-output">產生的政策</label><textarea id="policy-output" readonly spellcheck="false" rows="11"></textarea><p id="output-note" class="output-note"></p><div class="output-actions"><button id="copy-output" class="button mint">複製設定 <span aria-hidden="true">▣</span></button><button id="download-output" class="button output-download" aria-label="下載目前輸出" title="下載目前輸出">↓</button></div><p class="output-footnote">匯出後可再次貼入編輯。保存完整專案請用 JSON。</p></section>
+          <section class="panel diagnostics-panel"><div class="panel-heading"><h2>設定檢查</h2><span id="diagnostics-count" class="badge neutral"></span></div><p id="diagnostics-summary" class="field-help"></p><div id="diagnostics"></div><p class="small-note">這是靜態規則檢查，不是安全稽核或相容性保證。</p></section>
+          <section id="changes-panel" class="panel" hidden><details><summary><strong>相較匯入政策的變更</strong></summary><pre id="policy-changes"></pre></details></section>
+          <a class="next-step" href="#simulator" data-go="simulator"><span><small>下一步</small><strong>這個資源會被擋嗎？</strong></span><span aria-hidden="true">→</span></a>
+        </aside>
       </div>
-    
-  <details class="csp-input-wrapper">
-    <summary style="cursor: pointer; font-size: 1.1em; font-weight: bold;">📥 點此展開並貼上現有的 CSP 設定</summary>
-    <textarea id="cspInput" placeholder="貼上現有的 CSP，例如：default-src 'self'; img-src https://example.com;"></textarea>
-    <button onclick="parseCSP()">⬇️ 解析並載入 CSP</button>
-  </details>
-      <div id="directives-container"></div>
-      <button onclick="generateCSP()">🚀 產生 Content-Security-Policy 標頭</button>
-      <h2>產生的 Content-Security-Policy 標頭</h2>
-   <div class="result-box">
-  <textarea id="cspOutput" readonly></textarea>
-  <button class="copy-button" onclick="copyCSP()">📋 複製</button>
-</div>
-     
-      <footer>
-    <p><strong>by 鄭郁翰 (Yu-Han Cheng)</strong><br>
-    📧 E-mail：<a href="mailto:kaoshou@gmail.com">kaoshou@gmail.com</a><br>
-    🔗 GitHub 專案：<a href="https://github.com/kaoshou/csp-generator" target="_blank">csp-generator</a></p>
-    <p>
-      🔒 本程式碼以 <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank">GNU GPL-3.0 授權條款</a> 授權釋出。
-    </p>
-  </footer>
-      <script>
-         // 關鍵字說明，提供 tooltip 使用
-         const keywordDescriptions = {
-           "'self'": "僅允許與當前網頁相同來源的資源",
-           "'none'": "完全禁止此類資源的載入",
-           "'unsafe-inline'": "允許行內 script/style，可能導致 XSS 攻擊，請謹慎使用 ⚠️",
-           "'unsafe-eval'": "允許 eval() 或類似方式執行字串程式碼，極高風險 ⚠️",
-           "allow-forms": "允許 iframe 中的表單提交功能",
-           "allow-scripts": "允許 iframe 執行 JavaScript 腳本",
-           "allow-same-origin": "允許 iframe 保持與父頁面相同來源身份，否則為 sandbox 狀態",
-           "'strict-dynamic'": "允許信任的 script 自動載入其他來源的 script，但會忽略其他來源限制，需搭配 nonce 或 hash 使用 ⚠️",
-           "'nonce-{nonce_value}'": "允許附有特定 nonce 值的 inline script/style 被執行，常與 CSP header 搭配產生 nonce 動態值",
-           "script": "要求 JavaScript 檔案必須使用 Subresource Integrity (SRI)",
-           "style": "要求 CSS 樣式表必須使用 Subresource Integrity (SRI)"};
-         
-         // 各 CSP 指令定義，包括說明與建議來源
-         const directives = {
-           "default-src": {
-         	label: "default-src",
-         	description: "預設資源來源。若其他未明確定義的類別會使用此設定。",
-         	options: ["'self'", "'none'"]
-           },
-           "script-src": {
-         	label: "script-src",
-         	description: "允許的 JavaScript 腳本來源。若未指定，則使用 default-src。",
-         	options: ["'self'", "'unsafe-inline'", "'unsafe-eval'","'strict-dynamic'" , "'nonce-{nonce_value}'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com" , "https://ajax.googleapis.com"]
-           },
-           "style-src": {
-         	label: "style-src",
-         	description: "允許的 CSS 樣式來源，包括樣式表與內嵌 style。",
-         	options: ["'self'", "'unsafe-inline'",  "'nonce-{nonce_value}'","https://fonts.googleapis.com"]
-           },
-           "img-src": {
-         	label: "img-src",
-         	description: "圖片資源的允許來源，例如 <img>, CSS 背景圖等。",
-         	options: ["'self'" , "data:", "blob:" , "https:"]
-           },
-           "media-src": {
-         	label: "media-src",
-         	description: "音訊、影片等媒體資源的來源。",
-         	options: ["'self'"]
-           },
-           "connect-src": {
-         	label: "connect-src",
-         	description: "允許的網路連線，例如 fetch、XHR、WebSocket 等。",
-         	options: ["'self'"]
-           },
-           "font-src": {
-         	label: "font-src",
-         	description: "字型檔案的來源（如 @font-face）。",
-         	options: ["'self'", "https://fonts.gstatic.com"]
-           },
-           "frame-src": {
-         	label: "frame-src",
-         	description: "允許的 iframe 來源。與 frame-ancestors 搭配可防止點擊劫持。",
-         	options: ["'self'", "https://www.youtube.com", "https://www.google.com/maps", "https://www.facebook.com"]
-           },
-           "frame-ancestors": {
-             label: "frame-ancestors",
-             description: "限制本頁面可被哪些來源的 iframe 或 frame 嵌入，用以防止點擊劫持攻擊。若要相容 IE，建議同時設定 X-Frame-Options 標頭。",
-             options: ["'none'", "'self'"]
-           },
-           "object-src": {
-         	label: "object-src",
-         	description: "<span class='note'>控制 &lt;object&gt;, &lt;embed&gt; 等老舊外掛的資源來源。</span> 建議設為 'none'。",
-         	options: ["'none'", "'self'"]
-           },
-           "worker-src": {
-         	label: "worker-src",
-         	description: "允許 Web Worker 與 Service Worker 的來源。",
-         	options: ["'none'","'self'"]
-           },
-           "base-uri": {
-         	label: "base-uri",
-         	description: "限制 &lt;base&gt; 標籤指定的 URL 基底來源，以避免網址重寫攻擊。",
-         	options: ["'self'", "'none'"]
-           },
-           "sandbox": {
-         	label: "sandbox",
-         	description: "啟用 CSP 沙箱模式，限制 iframe 中內容行為（如禁止提交表單、執行 script 等）。可加入 allow-forms 等權限子集。",
-         	options: ["allow-forms", "allow-scripts", "allow-same-origin"]
-           },
-           "require-sri-for": {
-         	label: "require-sri-for",
-         	description: "強制特定類型資源（如 script 或 style）使用 Subresource Integrity (SRI)。",
-         	options: ["script", "style"]
-           },
-           "report-uri": {
-         	label: "report-uri",
-         	description: "已逐步淘汰的違規回報機制，仍具相容性，建議與 report-to 搭配使用。",
-         	options: []
-           },
-           "report-to": {
-         	label: "report-to",
-         	description: "CSP 違規事件的現代回報機制，需搭配 Reporting API 的報告端點設定使用。",
-         	options: []
-           }
-         };
-         
-         const sources = {};
-         
-         function init() {
-           const container = document.getElementById('directives-container');
-           for (const dir in directives) {
-         	sources[dir] = [];
-         	const section = document.createElement('div');
-         	section.className = 'directive';
-         	const optionCheckboxes = directives[dir].options.map(opt => {
-         	  const display = keywordDescriptions[opt] ? `<span title="${keywordDescriptions[opt]}">${opt}</span>` : opt;
-         	  return `<label><input type="checkbox" onchange="toggleSource('${dir}', \`${opt}\`)">${display}</label>`;
-         	}).join('');    
-         	section.innerHTML = `
-         	  <h3>${directives[dir].label}</h3>
-         	  <p class="note">${directives[dir].description}</p>
-         	  <div>常見來源選項：<br>${optionCheckboxes}</div>
-         	  <div style="margin-top:10px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-         		➕ 自訂來源：
-         		<input type="text" id="input-${dir}" placeholder="例如 https://example.com">
-         		<button onclick="addCustomSource('${dir}')">新增</button>
-         	  </div>
-         	  <ul id="list-${dir}" class="source-list"></ul>
-         	`;
-         	container.appendChild(section);
-           }
-         }
-         
-         function toggleSource(dir, value) {
-           const idx = sources[dir].indexOf(value);
-           if (idx === -1) {
-         	sources[dir].push(value);
-           } else {
-         	sources[dir].splice(idx, 1);
-           }
-           renderSourceList(dir);
-         }
-         
-         function addCustomSource(dir) {
-           const input = document.getElementById('input-' + dir);
-           const val = input.value.trim();
-           if (val && !sources[dir].includes(val)) {
-         	sources[dir].push(val);
-         	renderSourceList(dir);
-           }
-           input.value = '';
-         }
-         
-         function renderSourceList(dir) {
-           const ul = document.getElementById('list-' + dir);
-           ul.innerHTML = sources[dir].map(s => `<li>${s}</li>`).join('');
-         }
-         
-         function generateCSP() {
-           let result = [];
-           for (const dir in sources) {
-         	if (sources[dir].length > 0) {
-         	  result.push(`${dir} ${sources[dir].join(' ')}`);
-         	}
-           }
-           document.getElementById('cspOutput').value = result.length > 0 ? result.join('; ') + ';' : '';
-         }
-         function parseCSP() {
-      const input = document.getElementById('cspInput').value.trim();
-      if (!input) return;
-
-      const checkboxes = document.querySelectorAll("input[type='checkbox']");
-      checkboxes.forEach(cb => cb.checked = false);
-
-      const lists = document.querySelectorAll(".source-list");
-      lists.forEach(list => list.innerHTML = '');
-
-      const directivesList = input.split(';').map(s => s.trim()).filter(Boolean);
-      directivesList.forEach(item => {
-        const [dir, ...vals] = item.split(/\s+/);
-        const ul = document.getElementById(`list-${dir}`);
-        if (ul && vals.length) {
-          vals.forEach(val => {
-            const li = document.createElement('li');
-            li.textContent = val;
-            ul.appendChild(li);
-            const checkbox = document.querySelector(`input[type='checkbox'][onchange*="toggleSource('${dir}', \`${val.replace(/'/g, "\\'")}\`)"]`);
-            if (checkbox) checkbox.checked = true;
-          });
-        }
-      });
-    } 
-             function copyCSP() {
-        const textarea = document.getElementById("cspOutput");
-        textarea.select();
-        textarea.setSelectionRange(0, 99999); // for mobile
-        document.execCommand("copy");
-        alert("已複製 CSP 設定！");
-      }
-         window.onload = init;
-          
-      </script>
-   </body>
+    </section>
+    <section id="view-simulator" class="view" aria-labelledby="sim-heading" hidden>
+      <div class="page-intro"><p class="eyebrow">EXPLORE THE EFFECT</p><h2 id="sim-heading">先問一次：這樣會被擋嗎？</h2><p>以目前政策推演單一來源規則，不會發出網路請求或執行任何腳本。</p></div>
+      <div class="two-column"><section class="panel simulator-form"><h3>測試一個資源</h3><p>網站來源：<code id="sim-origin"></code> <span id="sim-mode" class="badge neutral"></span></p><label>資源類型<select id="sim-type"><option value="script-src-elem">JavaScript / script 元素</option><option value="style-src-elem">CSS / style 與 link 元素</option><option value="img-src">圖片</option><option value="connect-src">API / fetch / WebSocket</option><option value="font-src">字型檔</option><option value="frame-src">嵌入 iframe</option><option value="media-src">影音</option><option value="worker-src">Worker</option><option value="object-src">object / embed</option><option value="manifest-src">Manifest</option><option value="form-action">表單目的地</option><option value="script-src-attr">onclick 等事件屬性</option><option value="style-src-attr">style 屬性</option></select></label><label>使用方式<select id="sim-kind"><option value="external">外部資源 URL</option><option value="inline">行內內容</option><option value="eval">eval() 字串編譯</option></select></label><label id="sim-url-field">資源 URL<input id="sim-url" value="https://cdn.example.net/app.js" spellcheck="false" placeholder="https://cdn.your-domain.com/app.js"></label><details class="sim-advanced"><summary>Nonce / hash 與動態載入</summary><div class="details-body"><label>元素 nonce（不含 nonce- 前綴）<input id="sim-nonce" spellcheck="false"></label><label>內容 hash（含單引號）<input id="sim-hash" spellcheck="false" placeholder="'sha256-…'"></label><label class="check-label"><input id="sim-dynamic" type="checkbox"> 由其他腳本動態建立的 script</label></div></details><button id="run-simulation" class="button dark">檢查目前政策 <span aria-hidden="true">→</span></button></section><div><section id="simulation-result" class="panel simulation-result" aria-live="polite"><span class="result-icon" aria-hidden="true">?</span><h3>看懂規則如何生效</h3><p>選擇類型與來源後執行檢查，就能看到命中的指令，以及它為什麼允許或封鎖。</p></section><section class="notice"><h3>模擬允許 ≠ 網站一定能運作</h3><p>這裡以現代 CSP 來源規則做簡化推演。CORS、混合內容、重新導向、多重政策的交集、完整 iframe 祖先鏈、動態信任、SRI、Trusted Types 和瀏覽器差異仍需實測。</p><p>觀察模式只回報違規，並不提供強制阻擋的保護。</p></section><div class="example-tests"><strong>快速試試</strong><button class="button subtle" data-example="same">同源圖片</button><button class="button subtle" data-example="external">外站腳本</button><button class="button subtle" data-example="inline">行內腳本</button></div></div></div>
+    </section>
+    <section id="view-rollout" class="view" aria-labelledby="rollout-heading" hidden>
+      <div class="page-intro"><p class="eyebrow">DEPLOY WITH CONFIDENCE</p><h2 id="rollout-heading">把「怕網站壞掉」，變成可驗證的步驟。</h2><p>先保存原設定，再觀察實際使用流程，最後逐步開啟強制防護。</p></div>
+      <div class="rollout-grid"><article class="panel rollout-card"><span class="step-number">01</span><h3>盤點與保留退路</h3><p>匯出目前的 JSON 專案，備份伺服器或 CDN 原有標頭。盤點第三方腳本、API、字型、iframe、付款與登入流程。</p><label class="check-label"><input type="checkbox"> 已備份設定並確認回復方式</label></article><article class="panel rollout-card"><span class="step-number">02</span><h3>部署 Report-Only</h3><p>選擇觀察模式，將設定加到<strong>文件的 HTTP 回應</strong>。開啟開發者工具 Network 確認最終標頭，Console 查看違規。</p><p>若需集中回報，設定 report-to、Reporting-Endpoints 與實際接收服務，並送出測試事件。</p><label class="check-label"><input type="checkbox"> 已確認實際回應與回報可見</label></article><article class="panel rollout-card"><span class="step-number">03</span><h3>測完整操作路徑</h3><p>涵蓋登入／登出、搜尋、上傳預覽、表單、付款、影片、列印、行動版與不同瀏覽器。將合法需求加入精確來源；不要一律以 * 或 unsafe-inline 排除錯誤。</p><label class="check-label"><input type="checkbox"> 已測試關鍵流程與不同角色</label></article><article class="panel rollout-card"><span class="step-number">04</span><h3>小範圍強制，再持續觀察</h3><p>在測試環境或少量流量使用強制模式，確認後再擴大。出問題時回復原標頭或改回 Report-Only，並確認 CDN 快取已更新。</p><p>sandbox 與 upgrade-insecure-requests 的影響無法靠 Report-Only 完整預演，需另外測試。</p><label class="check-label"><input type="checkbox"> 已安排監控與回復負責人</label></article></div>
+      <section class="panel troubleshooting"><h3>出問題時，從現象找規則</h3><div class="table-wrap"><table><thead><tr><th>你看到的現象</th><th>優先檢查</th><th>處理方向</th></tr></thead><tbody><tr><td>按鈕沒反應、畫面空白</td><td>script-src / script-src-elem / script-src-attr</td><td>找 Console 違規；外移 onclick、加正確 nonce/hash，檢查 strict-dynamic 載入鏈。</td></tr><tr><td>版面跑掉、字型不對</td><td>style-src / style-src-attr / font-src</td><td>字型 CSS 與字型檔是兩種來源；盤點框架的行內樣式。</td></tr><tr><td>登入、搜尋、即時通知失效</td><td>connect-src / form-action / frame-src</td><td>確認實際 API、表單、iframe 與 wss:// 來源，再另外檢查 CORS。</td></tr><tr><td>外部影片或嵌入頁空白</td><td>frame-src / 對方的 frame-ancestors</td><td>本站允許載入對方，仍需對方允許被本站嵌入。</td></tr><tr><td>收到多組 CSP 標頭</td><td>伺服器 / Proxy / CDN 的設定</td><td>各組強制政策是交集；新增較寬的標頭不能解除另一組的封鎖。</td></tr><tr><td>沒有任何違規報告</td><td>report-to / Reporting-Endpoints / report-uri</td><td>確認群組名稱、接收服務、支援度與網路；回報不保證即時或完整。</td></tr></tbody></table></div></section>
+      <div class="inline-actions"><button class="button dark" data-go="editor">回到政策設定</button><button class="button subtle" data-action="download-project">先下載專案備份 ↓</button></div>
+    </section>
+    <section id="view-learn" class="view" aria-labelledby="learn-heading" hidden>
+      <div class="page-intro"><p class="eyebrow">LEARN BY DOING</p><h2 id="learn-heading">不只產生一串字，也知道它代表什麼。</h2><p>CSP 是瀏覽器執行的額外防線；它不會清理輸入，也不能取代修補 XSS、權限控制或安全的程式碼。</p></div>
+      <div class="lesson-grid"><article class="panel lesson"><span class="lesson-label">基本觀念</span><h3>每個指令，是一類資源的規則</h3><pre>default-src 'self';
+img-src 'self' https://images.example;
+object-src 'none';</pre><p>一般資源先參考 default-src；圖片因為另外指定 img-src，會使用自己的完整名單。none 代表不允許這類資源，self 指同協定、網域與連接埠。</p><p><strong>不是所有指令都會回退。</strong>frame-ancestors、base-uri、form-action 必須另外設定。</p></article><article class="panel lesson"><span class="lesson-label">常見混淆</span><h3>載入別人，與被別人嵌入</h3><div class="direction-diagram"><span>你的網站</span><b aria-hidden="true">→</b><span>外部 iframe</span><small>frame-src</small></div><div class="direction-diagram"><span>別人的網站</span><b aria-hidden="true">→</b><span>你的頁面</span><small>frame-ancestors</small></div><p>允許你載入影片，不代表允許別人嵌入你的網頁。frame-ancestors 要檢查完整祖先鏈，且只能透過 HTTP 標頭設定。</p></article><article class="panel lesson"><span class="lesson-label">行內程式碼</span><h3>self 不會允許行內腳本</h3><p>同源 app.js 可以符合 self，但直接寫在 HTML 的 script、onclick 或 eval() 是不同的檢查。</p><p><strong>Nonce：</strong>後端每次回應產生不可預測的新亂數，同時放進政策與 script/style 的 nonce 屬性。不能把產生器的固定值貼上永久使用。</p><p><strong>Hash：</strong>授權完全相同的片段；任何空白改動都需要重新計算。外部 script 還涉及 integrity 與支援度。</p></article><article class="panel lesson"><span class="lesson-label">部署差異</span><h3>觀察模式不會提供強制防護</h3><p>Content-Security-Policy-Report-Only 讓你在不強制擋資源的情況下收集違規，適合改版前盤點。確認後改為 Content-Security-Policy 才會封鎖違規行為。</p><p>同一網站可同時觀察一份新政策並強制既有政策；本工具一次編輯其中一份。sandbox 不支援 Report-Only；meta 也不支援觀察模式。</p></article></div>
+      <section class="panel classroom"><div><span class="eyebrow">CLASSROOM EXERCISE</span><h3>10 分鐘課堂練習：從全部封鎖到精準開放</h3><p>套用「從全部封鎖學習」→ 模擬同源圖片 → 在 img-src 加入 self → 再模擬一次 → 改測外站圖片。讓學生說明每次結果改變的原因，再比較觀察與強制模式。</p></div><button class="button dark" data-scenario="deny">載入教學情境 →</button></section>
+      <section class="panel references"><h3>繼續查核</h3><p>規格與瀏覽器支援會演進，部署前請查閱原始文件。內建說明查核日期：2026-11-09。</p><a href="https://www.w3.org/TR/CSP3/" target="_blank" rel="noopener noreferrer">W3C CSP Level 3 ↗</a><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy" target="_blank" rel="noopener noreferrer">MDN 指令參考 ↗</a><a href="https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/CSP" target="_blank" rel="noopener noreferrer">MDN 部署指南 ↗</a><a href="https://csp-evaluator.withgoogle.com/" target="_blank" rel="noopener noreferrer">Google CSP Evaluator ↗</a><p class="small-note">外部工具有自己的資料處理方式；本工具不會自動把政策送出。</p></section>
+    </section>
+    <footer><div><strong>CSP 工作台</strong><span>建立政策，也理解影響。</span></div><p>by 鄭郁翰 (Yu-Han Cheng) · <a href="https://github.com/kaoshou/csp-generator" target="_blank" rel="noopener noreferrer">GitHub ↗</a> · <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener noreferrer">GPL-3.0</a></p></footer>
+  </main>
+  <dialog id="import-dialog" aria-labelledby="import-title"><div class="dialog-heading"><div><p class="eyebrow">CONTINUE YOUR WORK</p><h2 id="import-title">匯入現有政策</h2></div><button class="icon-button" data-close="import-dialog" aria-label="關閉匯入視窗">×</button></div><p>貼上單一 CSP 政策值、完整 HTTP 標頭，或本工具的 JSON 專案。匯入前會先預覽，套用後可復原。</p><label for="import-text">政策或專案內容</label><textarea id="import-text" rows="7" spellcheck="false" placeholder="default-src 'self'; img-src 'self' data:;"></textarea><div class="import-file-row"><label class="file-button">從檔案讀取<input id="import-file" type="file" accept=".json,.txt,.conf,text/plain,application/json"></label><span class="field-help">最大 200 KB · 不會上傳</span><button id="preview-import" class="button dark">解析並預覽</button></div><div id="import-preview" class="import-preview" aria-live="polite" hidden></div><div class="dialog-actions"><button class="button subtle" data-close="import-dialog">取消</button><button id="apply-import" class="button dark" disabled>套用匯入政策</button></div></dialog>
+  <dialog id="scenario-dialog" aria-labelledby="scenario-title"><div class="dialog-heading"><h2 id="scenario-title"></h2><button class="icon-button" data-close="scenario-dialog" aria-label="關閉情境視窗">×</button></div><p id="scenario-description"></p><div class="notice"><strong>套用前先了解</strong><p id="scenario-impact"></p></div><p class="field-help">會取代目前的所有規則與回報端點，並切回觀察模式；保留專案名稱與網站來源。可使用復原還原。</p><pre id="scenario-policy"></pre><div class="dialog-actions"><button class="button subtle" data-close="scenario-dialog">取消</button><button id="apply-scenario" class="button dark">套用情境</button></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <noscript><p class="notice">此工具需要 JavaScript 才能編輯與產生 CSP；所有政策處理都在瀏覽器本機完成。</p></noscript>
+</body>
 </html>

@@ -1,0 +1,9 @@
+{
+  "name": "csp-workbench",
+  "version": "2.0.0",
+  "private": true,
+  "description": "CSP 政策工作台：建立、理解、驗證與重新編輯",
+  "scripts": { "test": "node --test tests/*.test.cjs", "dev": "node scripts/serve.cjs" },
+  "engines": { "node": ">=22" },
+  "license": "GPL-3.0-only"
+}
