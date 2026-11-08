@@ -12,8 +12,8 @@
 - [x] Implement scripts/guidance.js and baseline catalog entry; run full suite.
 - [x] Build guidance work area, preview dialog, linked scanner/official guidance, professional visual polish and clear hash documentation.
 - [x] Run Node checks and comprehensive local browser tests, including prior regression flows and responsive screens. Obtain independent review and address material issues.
-- [ ] Update README and verification record; commit and push; create PR, verify CI, merge to main as explicitly authorized.
-- [ ] Wait for GitHub Pages deployment, verify public assets and core browser flows, record URLs and commit.
+- [x] Update README and verification record; commit and push; create PR #1, verify CI, merge to main as explicitly authorized.
+- [x] Wait for GitHub Pages deployment, verify public assets and core browser flows, record URLs and commit. Runtime release f815648 / 2.1.0; see docs/verification.md.
 
 ## Review focus
 

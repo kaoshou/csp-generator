@@ -15,6 +15,20 @@
 
 以上是工具功能與本機來源規則驗證，不是目標網站的弱掃或真實 Google/CDN 服務相容性保證。指南本身不主動載入第三方服務；實際整合仍需依需求、官方文件與完整頁面流程驗證。
 
+### 已部署到原站點並完成公開驗證
+
+- [PR #1](https://github.com/kaoshou/csp-generator/pull/1) 已合併到 `main`，功能版本提交為 `f81564868f9324ae95edcf94bf92f6370e14f2d4`（2.1.0）。
+- 分支、PR 與 main 的回歸 CI 通過；[Pages 建置與部署](https://github.com/kaoshou/csp-generator/actions/runs/42514820131) 成功。
+- 正式站點：[https://csp.yuhan.tw/](https://csp.yuhan.tw/)。逐一 HTTP 取得 HTML、CSS、catalog/core/guidance/app 四份 JavaScript 及圖示：全部 200、MIME 正確，正規化換行後與已測試的本機資產內容完全一致。
+- 正式站點 `tests/browser.html` 與 `docs/verification.md` 均為 404，符合開發資料排除設定；文件仍保留於 GitHub repository。
+- 在正式 HTTPS 網址透過瀏覽器 UI 逐一操作 10 種整合，確認來源正確，script fallback 未被非預期改寫；復原／重做正確。
+- 公開站 JSON 匯出再貼回逐字一致；多重政策不能套用；raw/header/nginx/apache/json 格式正常，Report-Only meta 正確阻止輸出；實際複製再 Ctrl+V 貼回標頭成功。
+- 公開站 SHA-256／384／512 的 hello 範例全部符合已知值，hash 加入政策正常；同源圖片允許、外站腳本封鎖推演正常，保留觀察模式差異說明。
+- 公開站本機草稿儲存／載入／清除成功，只操作本次產生的測試草稿。實際下載 `csp-online-validation-20261109.csp.json` 並解析內容成功。
+- 公開站 390px 頁面與整合預覽對話框均無水平溢出；測試 viewport 已重設。最後擷取的瀏覽器 JavaScript error 紀錄為空，並將預覽恢復到正式首頁。
+
+以上驗證對應未變動的 2.1.0 執行期資產；後續僅補上本驗證紀錄與計畫勾選狀態，不修改工具程式。
+
 ## 2.0 開發紀錄（保留歷史）
 
 日期：2026-11-09。環境：Windows、Node.js 24.14.0、Google Chrome，本機 loopback 開發伺服器。
