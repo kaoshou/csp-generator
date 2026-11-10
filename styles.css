@@ -329,6 +329,7 @@ dialog textarea { margin-top: 7px; }
 .hero-description { font-size: 13px; line-height: 1.85; color: #b7c7db; max-width: 650px; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 23px; }
 .hero-actions .button { padding: 9px 15px; }
+.hero-actions > a,.classroom > a.button { text-decoration: none; flex-shrink: 0; }
 .hero-secondary { color: #deebff; background: #223a53; border-color: #476077; }
 .hero-secondary:hover { background: #2b4966; }
 .hero-console { min-width: 310px; width: 350px; flex-shrink: 0; border: 1px solid #42657a; border-radius: 10px; background: #0b1929df; box-shadow: 0 16px 32px #04121f40; transform: rotate(-1deg); }

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="完整認識 Content Security Policy：CSP 出現前的防護、要解決的 XSS 問題、發展歷史、瀏覽器運作、nonce/hash、用途限制與部署方式。附原始來源。">
+  <meta name="color-scheme" content="light">
+  <title>認識 CSP｜發展歷史、用途與安全原理</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css?v=2.1.1">
+  <link rel="stylesheet" href="primer.css?v=2.1.1">
+</head>
+<body class="primer-page">
+  <a class="skip" href="#article">跳至文章內容</a>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="CSP 工作台首頁"><span class="brand-mark" aria-hidden="true">{<span>✓</span>}</span><span>CSP <b>工作台</b><small>CONTENT SECURITY POLICY</small></span></a>
+    <a class="button primer-back" href="index.html#editor">前往工作台 <span aria-hidden="true">→</span></a>
+  </header>
+  <main class="primer-shell">
+    <section class="primer-hero" aria-labelledby="primer-title">
+      <div><p class="eyebrow">THE CONTEXT BEHIND THE POLICY</p><h1 id="primer-title">先理解問題，<br><span>再認識 CSP。</span></h1><p>從瀏覽器原有的防線，到網站可以宣告的信任邊界。認識它為什麼出現、如何運作，以及能幫你做到什麼。</p><div class="primer-meta"><span>入門 → 原理 → 實務</span><span>資料查核：2026-11-11</span></div></div>
+      <div class="primer-cover" aria-label="CSP 發展重點"><div><span>起點</span><strong>隔離不同網站</strong><small>Same-origin policy</small></div><b aria-hidden="true">↓</b><div><span>新的問題</span><strong>如果惡意程式已混入本站？</strong><small>Cross-site scripting</small></div><b aria-hidden="true">↓</b><div><span>額外防線</span><strong>明確授權內容與來源</strong><small>Content Security Policy</small></div></div>
+    </section>
+    <div class="primer-layout">
+      <aside class="primer-toc"><nav aria-label="文章目錄"><p>本頁內容 <span>CONTENTS</span></p><a href="#overview">01　CSP 是什麼</a><a href="#before">02　CSP 之前用什麼</a><a href="#problem">03　它要解決的問題</a><a href="#history">04　發展歷史</a><a href="#how">05　瀏覽器如何執行</a><a href="#directives">06　常見用途與指令</a><a href="#trust">07　白名單、nonce 與 hash</a><a href="#limits">08　限制與其他防護</a><a href="#rollout">09　導入與教學</a><a href="#faq">10　常見問題</a><a href="#sources">11　來源與延伸閱讀</a></nav><div class="toc-note">本頁可獨立閱讀、分享與列印，不需要執行 JavaScript。</div></aside>
+      <article id="article" class="primer-article">
+        <section id="overview" class="primer-section">
+          <p class="eyebrow">01 / THE IDEA</p><h2>CSP 是什麼？</h2>
+          <p><strong>Content Security Policy（內容安全政策）是一套由網站宣告、瀏覽器執行的內容限制。</strong>網站可以告訴瀏覽器：哪些腳本、圖片、樣式與連線是預期的，以及頁面能否被其他網站嵌入。它尤其常被用來降低 XSS（跨站腳本）與內容注入造成的影響。<a class="source-ref" href="#ref-header">[1]</a></p>
+          <div class="primer-key"><strong>先記住這個定位</strong><p>CSP 是縱深防禦的一層。它讓「成功注入」不一定等於「能成功執行」，但不會自動修補注入漏洞，也不能取代安全的程式碼。<a class="source-ref" href="#ref-owasp-csp">[2]</a></p></div>
+          <p>本頁的說明按現代 CSP 行為整理；歷史段落則保留各時期的規範狀態。範例是教學用途，實際政策仍須配合網站使用的資源與目標瀏覽器。</p>
+        </section>
+        <section id="before" class="primer-section">
+          <p class="eyebrow">02 / BEFORE CSP</p><h2>在 CSP 之前，網站靠什麼防護？</h2>
+          <p>當時並不是沒有安全機制。瀏覽器負責隔離不同來源，開發者則要避免不可信資料變成程式碼。這些措施今天仍然重要；CSP 補上的是<strong>網站對內容執行與資源載入的明確授權</strong>。<a class="source-ref" href="#ref-sop">[3]</a><a class="source-ref" href="#ref-owasp-xss">[4]</a></p>
+          <div class="defense-list">
+            <div><h3>同源政策（SOP）</h3><p>限制某個來源的文件或腳本如何讀取另一個來源的資料；來源通常由協定、主機與連接埠組成。跨來源的嵌入則有不同規則，例如一般外部 script 可以被網頁載入。因此，SOP 並不等於「只准執行本站寫的 JavaScript」。<a class="source-ref" href="#ref-sop">[3]</a></p></div>
+            <div><h3>輸入驗證、情境化輸出編碼與 HTML 清理</h3><p>驗證資料格式；把文字放到 HTML、屬性或其他位置時，採用適合該情境的輸出處理；真正需要保留 HTML 時，使用合適的清理工具。避免把不可信字串直接送入 innerHTML 等危險接收點。這些是防止注入的基礎。<a class="source-ref" href="#ref-owasp-xss">[4]</a></p></div>
+            <div><h3>HttpOnly 等 Cookie 保護</h3><p>HttpOnly 讓 JavaScript 不能直接透過 document.cookie 讀取該 Cookie，但瀏覽器仍可能在請求中攜帶它；所以惡意腳本即使讀不到 Cookie，仍可能以使用者身分操作頁面或發出請求。它降低部分後果，並不消除 XSS。<a class="source-ref" href="#ref-cookie">[5]</a></p></div>
+            <div class="legacy-defense"><h3>歷史上的瀏覽器 XSS 過濾器</h3><p>部分瀏覽器曾利用 X-XSS-Protection 等機制偵測反射型 XSS。這是歷史做法，現今已棄用，而且某些情況下可能引入額外問題；不應把重新啟用它當作現代 XSS 防護方案。<a class="source-ref" href="#ref-xss-filter">[6]</a></p></div>
+          </div>
+          <div class="primer-callout"><strong>為什麼有同源政策，還會有 XSS？</strong><p>當惡意程式被注入可信網站並在它的文件情境執行時，問題已經進入了那個網站的權限範圍。瀏覽器不是在「讓另一個網站偷讀」，而是在執行它以為屬於目前頁面的程式。<a class="source-ref" href="#ref-mdn-xss">[7]</a></p></div>
+        </section>
+        <section id="problem" class="primer-section">
+          <p class="eyebrow">03 / THE GAP</p><h2>CSP 要解決什麼問題？</h2>
+          <p>核心難題是：<strong>當合法內容和攻擊者注入的內容出現在同一份網頁，瀏覽器如何知道哪些程式被網站授權？</strong>Mozilla 在 2009 年介紹 CSP 時，就以這個內容信任問題說明設計動機。<a class="source-ref" href="#ref-mozilla">[8]</a></p>
+          <div class="attack-flow" aria-label="XSS 與 CSP 的概念流程"><div><span>01</span><strong>不可信輸入</strong><p>留言、網址參數或外部資料</p></div><b aria-hidden="true">→</b><div><span>02</span><strong>輸出處理有缺口</strong><p>資料被解讀成 HTML／程式碼</p></div><b aria-hidden="true">→</b><div><span>03</span><strong>瀏覽器執行檢查</strong><p>CSP 提供額外授權條件</p></div></div>
+          <div class="example-columns"><div><h3>沒有額外執行限制時</h3><pre><code>&lt;!-- 攻擊者注入的片段，僅為示意 --&gt;
+&lt;script&gt;runUntrustedCode();&lt;/script&gt;</code></pre><p>如果頁面把輸入當成可執行內容，且沒有其他有效防護，這段程式可能執行。問題根源仍是注入漏洞。<a class="source-ref" href="#ref-mdn-xss">[7]</a></p></div><div><h3>加入正確的 nonce 政策後</h3><pre><code>script-src 'nonce-REPLACE_PER_RESPONSE';
+object-src 'none';
+base-uri 'none';</code></pre><p>這是不可直接部署的樣板。伺服器須為每次回應產生新亂數，並放到授權 script 的 nonce 屬性；上述注入片段沒有正確 nonce，便不能靠普通行內 script 執行。<a class="source-ref" href="#ref-strict">[9]</a></p></div></div>
+          <p>效果取決於政策是否足夠嚴謹、是否真正強制執行，以及攻擊者能否利用已受信任的程式或來源。CSP 不是辨識所有惡意內容的掃毒引擎。<a class="source-ref" href="#ref-owasp-csp">[2]</a></p>
+        </section>
+        <section id="history" class="primer-section">
+          <p class="eyebrow">04 / THE TIMELINE</p><h2>從來源限制，走向更精準的內容授權。</h2>
+          <ol class="csp-timeline">
+            <li><time datetime="2009-06-19">2009 / 06</time><div><h3>Mozilla 公開介紹 CSP</h3><p>2009 年 6 月 19 日的官方文章介紹了以網站政策區分可信內容、降低 XSS 影響的方向。早期設計著重外部腳本及核准來源；不能把當年的全部限制直接當成今天 nonce/hash CSP 的行為。<a class="source-ref" href="#ref-mozilla">[8]</a></p></div></li>
+            <li><time datetime="2011-11-29">2011 / 11</time><div><h3>進入 W3C 公開規範歷程</h3><p>W3C 的 CSP 1.0 發布紀錄列出 2011 年 11 月 29 日 Working Draft，將政策語言與瀏覽器處理逐步帶入標準化流程。<a class="source-ref" href="#ref-csp1">[10]</a></p></div></li>
+            <li><time datetime="2012-11-15">2012 / 11</time><div><h3>CSP 1.0 候選推薦版本</h3><p>2012 年 11 月 15 日進入 Candidate Recommendation。這是標準化里程碑，不應寫成「當天所有瀏覽器都完整支援」。<a class="source-ref" href="#ref-csp1">[10]</a></p></div></li>
+            <li><time datetime="2015-02-19">2015 / 02</time><div><h3>CSP 1.0 文件退役，後續層級持續發展</h3><p>W3C 將 CSP 1.0 文件標示為 Retired。這指的是該版規範文件的狀態，並不代表 CSP 機制被停用或不再需要。<a class="source-ref" href="#ref-csp1">[10]</a><a class="source-ref" href="#ref-csp2">[11]</a></p></div></li>
+            <li><time datetime="2016-12-15">2016 / 12</time><div><h3>CSP Level 2 成為 W3C Recommendation</h3><p>2016 年 12 月 15 日發布 Recommendation；相較第一代，包含 nonce/hash 授權，以及 base-uri、form-action、frame-ancestors 等重要擴充。<a class="source-ref" href="#ref-csp2">[11]</a></p></div></li>
+            <li><span class="timeline-present">持續演進</span><div><h3>CSP Level 3 與現代實作</h3><p>Level 3 納入 strict-dynamic、較細的腳本／樣式指令與 worker-src 等能力。此次查核的 W3C 版本為 <time datetime="2026-10-27">2026 年 10 月 27 日</time> Working Draft；草案狀態與瀏覽器已實作的功能必須分開看。<a class="source-ref" href="#ref-csp3">[12]</a></p></div></li>
+          </ol>
+          <p class="primer-footnote">Level 不是網站上的「版本開關」。你送出指令，瀏覽器依它支援的規則處理；未知或不支援的部分可能被忽略。部署前應逐功能確認支援與行為。<a class="source-ref" href="#ref-header">[1]</a></p>
+        </section>
+        <section id="how" class="primer-section">
+          <p class="eyebrow">05 / HOW IT WORKS</p><h2>瀏覽器如何執行政策？</h2>
+          <ol class="primer-steps"><li><strong>網站隨文件回應送出政策。</strong>通常透過 Content-Security-Policy HTTP 回應標頭。HTML meta 能提供部分功能，但有限制。<a class="source-ref" href="#ref-header">[1]</a></li><li><strong>瀏覽器找到有效指令。</strong>例如圖片使用 img-src；沒有明列時，依規定的 fallback 鏈處理。不是所有指令都回退到 default-src。<a class="source-ref" href="#ref-csp3">[12]</a></li><li><strong>對來源或執行條件進行檢查。</strong>可能是 URL 是否符合來源名單、元素 nonce 是否一致、內容 hash 是否符合，或是否允許 eval 等行為。<a class="source-ref" href="#ref-header">[1]</a></li><li><strong>依模式限制並產生違規資訊。</strong>強制模式會阻擋違規行為；Report-Only 用於觀察，不會藉由該份政策強制阻擋。回報端點需另行設定與維運。<a class="source-ref" href="#ref-owasp-csp">[2]</a></li></ol>
+          <pre><code>Content-Security-Policy: default-src 'self'; img-src 'self' https://images.example; object-src 'none';</code></pre>
+          <p>這個入門範例讓圖片有自己的完整清單，其他適用的資源依預設來源限制，並禁止 object/embed。它不是完整的網站安全基線；例如表單、base 網址與誰能嵌入本站，仍須獨立考量。<a class="source-ref" href="#ref-header">[1]</a></p>
+          <div class="primer-callout"><strong>多份強制政策一起存在時，是共同限制。</strong><p>新增一份寬鬆政策不會解除原有嚴格政策的封鎖。上線時要一起檢查應用程式、反向代理與 CDN 最後送出的標頭。<a class="source-ref" href="#ref-csp3">[12]</a></p></div>
+        </section>
+        <section id="directives" class="primer-section">
+          <p class="eyebrow">06 / PRACTICAL PURPOSES</p><h2>它實際可以用在哪裡？</h2>
+          <div class="table-wrap"><table><thead><tr><th>想處理的需求</th><th>常見指令</th><th>需要一起理解的影響</th></tr></thead><tbody><tr><td>控制腳本與樣式</td><td>script-src、style-src</td><td>行內程式、事件、eval 與動態樣式可能失效；元素／屬性指令還可能另有覆寫。</td></tr><tr><td>縮小可連線與載入來源</td><td>connect-src、img-src、font-src、media-src</td><td>API、WebSocket、字型及圖片預覽各有需求；不是開放 script-src 就全部通行。</td></tr><tr><td>載入 YouTube 或地圖 iframe</td><td>frame-src</td><td>控制「本站載入誰」，不代表允許其他網站嵌入本站。</td></tr><tr><td>減少非預期的嵌入／點擊劫持</td><td>frame-ancestors</td><td>控制「誰能嵌入本站」，要檢查祖先鏈；須用 HTTP 標頭。</td></tr><tr><td>限制表單、base 與舊式物件</td><td>form-action、base-uri、object-src</td><td>可能影響跨站付款表單、前端路由的 base 或 object PDF 呈現。</td></tr><tr><td>收集政策違規</td><td>report-to、report-uri</td><td>需要真正的接收服務；相容性、流量、個資與資料保留均要規劃。</td></tr></tbody></table></div>
+          <p class="primer-footnote">指令用途與範圍依 MDN 參考整理。<a class="source-ref" href="#ref-header">[1]</a>服務實際需要的來源仍以官方文件與實測為準；工作台的「建議與整合」可預覽常見調整。</p>
+          <a class="button subtle" href="index.html#guidance">開啟建議與整合 →</a>
+        </section>
+        <section id="trust" class="primer-section">
+          <p class="eyebrow">07 / AUTHORIZING EXECUTION</p><h2>來源白名單、nonce、hash，有什麼不同？</h2>
+          <div class="trust-cards"><div><span>來源</span><h3>信任哪裡提供的內容</h3><p>例如 self 或固定 CDN。容易理解，但同源可控內容、共用 CDN 或特定腳本端點，都可能讓信任範圍大於預期。</p></div><div><span>Nonce</span><h3>授權這次回應的元素</h3><p>伺服器每次回應產生不可預測的新亂數，政策與 script/style 元素使用相同值。不能把固定值永久貼在頁面中。</p></div><div><span>Hash</span><h3>授權完全一致的內容</h3><p>適合穩定的行內片段。SHA-256、384、512 的 hash 對空白、換行及內容變更都敏感；修改後需要重新計算。</p></div></div>
+          <p>上述方式的語意不同。現代 strict CSP 常以 nonce/hash 作為信任起點，再視需要用 strict-dynamic 讓受信腳本載入其他腳本；它不是「所有動態內容自動安全」，載入鏈仍須檢查。<a class="source-ref" href="#ref-strict">[9]</a></p>
+          <p><strong>CSP hash 與 SRI 也不是同一個設定。</strong>CSP hash 參與腳本授權；SRI 以 integrity 屬性檢查外部資源內容。外部腳本的 hash 授權還涉及正確 integrity metadata 與瀏覽器行為，不能只複製一段字串就認定完成。<a class="source-ref" href="#ref-csp3">[12]</a><a class="source-ref" href="#ref-sri">[13]</a></p>
+        </section>
+        <section id="limits" class="primer-section">
+          <p class="eyebrow">08 / DEFENSE IN DEPTH</p><h2>哪些事情，CSP 不會替你完成？</h2>
+          <p>它不修補 SQL injection、伺服器權限錯誤或商業邏輯漏洞，也不會自動清理 HTML。即使 CSP 能擋下一種注入形式，漏洞本身仍應修正。<a class="source-ref" href="#ref-owasp-xss">[4]</a></p>
+          <div class="comparison-list"><div><h3>CSP 與 SOP／CORS</h3><p>SOP/CORS 處理不同來源之間的存取或讀取權限；CSP 處理目前文件允許的內容與行為。CSP 允許 API 連線，不代表 CORS、認證或伺服器授權也會允許。<a class="source-ref" href="#ref-sop">[3]</a><a class="source-ref" href="#ref-cors">[14]</a></p></div><div><h3>CSP 與 CSRF 防護</h3><p>限制表單或連線不是完整 CSRF 方案。伺服器仍須依應用情境驗證請求、使用適當 token 與 Cookie 策略；已在本站執行的惡意腳本也可能使這些防線失去原本預期的效果。<a class="source-ref" href="#ref-sop">[3]</a><a class="source-ref" href="#ref-cookie">[5]</a></p></div><div><h3>CSP 與 HTTPS／HSTS</h3><p>傳輸加密與內容授權是不同層面。upgrade-insecure-requests 可處理適用的 HTTP 資源升級，但不能取代主機的 HTTPS、憑證與 HSTS 規劃。<a class="source-ref" href="#ref-upgrade">[15]</a></p></div><div><h3>CSP 與弱點掃描</h3><p>標頭存在只是一個訊號。政策過寬、僅 Report-Only、未知指令或未覆蓋實際頁面，都可能讓防護不符合預期；掃描結果也不等於完成實際流程驗證。<a class="source-ref" href="#ref-zap">[16]</a><a class="source-ref" href="#ref-owasp-csp">[2]</a></p></div></div>
+        </section>
+        <section id="rollout" class="primer-section">
+          <p class="eyebrow">09 / FROM KNOWLEDGE TO PRACTICE</p><h2>正式上線與教學，可以怎麼開始？</h2>
+          <ol class="primer-steps"><li><strong>盤點與備份。</strong>列出腳本、API、登入、付款、iframe、字型與 Worker；保存原有 HTTP 標頭，先確認回復方式。</li><li><strong>建立符合需求的起點。</strong>從基線或現有政策出發，逐項縮小信任。不要一開始就把所有違規來源全部加入。</li><li><strong>先觀察，再測完整流程。</strong>以 Report-Only 搭配 Console／回報服務，檢查不同頁面、角色、裝置與瀏覽器。sandbox 與 HTTP 升級需另行實測，不能只靠觀察模式預演。</li><li><strong>分階段強制執行。</strong>先在測試環境或有限範圍開啟，確認最終回應、監控錯誤並保留回復方案。</li><li><strong>持續維護。</strong>套件升級、CDN 或功能變更後重新檢查。若合法流程壞掉，先找到有效指令，再做最小的必要調整。</li></ol>
+          <p class="primer-footnote">部署原則依 OWASP CSP 指南與 CSP 規範整理；步驟順序為本工具的實務教學安排。<a class="source-ref" href="#ref-owasp-csp">[2]</a><a class="source-ref" href="#ref-csp3">[12]</a></p>
+          <div class="primer-key"><strong>一個課堂練習</strong><p>比較同源外部 JS 與行內 script；再用 self、nonce 或 hash 分別測試。請學生解釋為什麼「來自本站」不等於「行內程式已獲授權」，並比較 Report-Only 與強制模式。此為本站自編教學活動。</p></div>
+          <a class="button dark" href="index.html#rollout">開啟安全上線工作區 →</a>
+        </section>
+        <section id="faq" class="primer-section">
+          <p class="eyebrow">10 / COMMON QUESTIONS</p><h2>常見問題</h2>
+          <details><summary>有 CSP，就不必處理輸出編碼或 HTML 清理了嗎？</summary><p>仍然需要。應用程式防止不可信輸入變成程式碼是基礎；CSP 是額外限制，不能當作唯一防線。<a class="source-ref" href="#ref-owasp-xss">[4]</a></p></details>
+          <details><summary>為什麼設定 self，按鈕上的 onclick 還是被擋？</summary><p>self 是來源條件，不是對所有行內事件的授權。建議移除 HTML 行內事件並使用 addEventListener；nonce 也不能直接授權 onclick 屬性。<a class="source-ref" href="#ref-csp3">[12]</a></p></details>
+          <details><summary>為什麼加了 CDN，腳本仍然不能執行？</summary><p>先檢查是否存在 script-src-elem 覆寫、strict-dynamic、另一份強制政策、SRI 錯誤或其他瀏覽器限制。不要直接放寬 default-src。<a class="source-ref" href="#ref-csp3">[12]</a><a class="source-ref" href="#ref-sri">[13]</a></p></details>
+          <details><summary>設定在 meta，和 HTTP 標頭一樣嗎？</summary><p>不一樣。meta 無法提供 Report-Only、frame-ancestors、sandbox 等全部功能，而且只對它被處理後的內容生效；正式部署通常應優先使用文件的 HTTP 回應標頭。<a class="source-ref" href="#ref-header">[1]</a><a class="source-ref" href="#ref-csp3">[12]</a></p></details>
+          <details><summary>Report-Only 顯示違規，是否代表使用者功能已被封鎖？</summary><p>不代表。該觀察政策本身不會強制阻擋；但網站可能同時有其他強制政策或不同的瀏覽器限制。要看實際回應與錯誤來源。<a class="source-ref" href="#ref-owasp-csp">[2]</a></p></details>
+          <details><summary>介紹頁會修改我的政策，或向外站傳送內容嗎？</summary><p>不會。本頁是無 JavaScript 的靜態說明，只在你點選來源連結時前往外部網站。從工作台的介紹入口會另開分頁，原分頁中的草稿仍保留。</p></details>
+        </section>
+        <section id="sources" class="primer-section primer-sources">
+          <p class="eyebrow">11 / REFERENCES</p><h2>來源與延伸閱讀</h2>
+          <p>本文由本站以繁體中文自行整理，非官方規範翻譯。外部事實已在相關段落以編號標示；未另標來源的操作安排、版面與課堂活動為本站整理。查核日期：<time datetime="2026-11-11">2026-11-11</time>。文件可能更新，歷史文件則用於說明當時脈絡。</p>
+          <ol class="source-list-primer">
+            <li id="ref-header"><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy" target="_blank" rel="noopener noreferrer">MDN — Content-Security-Policy header ↗</a><p>政策用途、指令、傳遞方式與限制。</p></li>
+            <li id="ref-owasp-csp"><a href="https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html" target="_blank" rel="noopener noreferrer">OWASP — Content Security Policy Cheat Sheet ↗</a><p>縱深防禦、部署與政策設計。</p></li>
+            <li id="ref-sop"><a href="https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Same-origin_policy" target="_blank" rel="noopener noreferrer">MDN — Same-origin policy ↗</a><p>來源隔離、跨來源嵌入與存取界線。</p></li>
+            <li id="ref-owasp-xss"><a href="https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html" target="_blank" rel="noopener noreferrer">OWASP — Cross Site Scripting Prevention Cheat Sheet ↗</a><p>輸出編碼、HTML 清理及不應只依賴 CSP 的原因。</p></li>
+            <li id="ref-cookie"><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie" target="_blank" rel="noopener noreferrer">MDN — Set-Cookie header ↗</a><p>HttpOnly 等 Cookie 屬性及其作用。</p></li>
+            <li id="ref-xss-filter"><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-XSS-Protection" target="_blank" rel="noopener noreferrer">MDN — X-XSS-Protection header ↗</a><p>已棄用的歷史過濾器及風險。</p></li>
+            <li id="ref-mdn-xss"><a href="https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/XSS" target="_blank" rel="noopener noreferrer">MDN — Cross-site scripting (XSS) ↗</a><p>注入問題與 CSP 作為補強的概念。</p></li>
+            <li id="ref-mozilla"><a href="https://blog.mozilla.org/security/2009/06/19/shutting-down-xss-with-content-security-policy/" target="_blank" rel="noopener noreferrer">Mozilla Security Blog — Shutting Down XSS with Content Security Policy ↗</a><p>Al Billings，2009-06-19。用於早期設計背景；非現代完整設定指南。</p></li>
+            <li id="ref-strict"><a href="https://web.dev/articles/strict-csp" target="_blank" rel="noopener noreferrer">Google web.dev — Mitigate XSS with a strict CSP ↗</a><p>Nonce、hash 與嚴格 CSP 的實作方向。</p></li>
+            <li id="ref-csp1"><a href="https://www.w3.org/standards/history/CSP1/" target="_blank" rel="noopener noreferrer">W3C — CSP 1.0 publication history ↗</a><p>2011 草案、2012 候選推薦及 2015 退役日期。</p></li>
+            <li id="ref-csp2"><a href="https://www.w3.org/TR/2016/REC-CSP2-20161215/" target="_blank" rel="noopener noreferrer">W3C — CSP Level 2 Recommendation, 2016-12-15 ↗</a><p>第二代規範與相較 Level 1 的能力擴充。</p></li>
+            <li id="ref-csp3"><a href="https://www.w3.org/TR/2026/WD-CSP3-20261027/" target="_blank" rel="noopener noreferrer">W3C — CSP Level 3 Working Draft, 2026-10-27 ↗</a><p>本次查核的固定版本。另見 <a href="https://www.w3.org/TR/CSP3/" target="_blank" rel="noopener noreferrer">最新規範</a>與<a href="https://www.w3.org/standards/history/CSP3/" target="_blank" rel="noopener noreferrer">發布歷史</a>。</p></li>
+            <li id="ref-sri"><a href="https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity" target="_blank" rel="noopener noreferrer">MDN — Subresource Integrity ↗</a><p>外部資源內容完整性、integrity 與跨來源條件。</p></li>
+            <li id="ref-cors"><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS" target="_blank" rel="noopener noreferrer">MDN — Cross-Origin Resource Sharing (CORS) ↗</a><p>跨來源請求與回應讀取控制。</p></li>
+            <li id="ref-upgrade"><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/upgrade-insecure-requests" target="_blank" rel="noopener noreferrer">MDN — upgrade-insecure-requests ↗</a><p>資源升級的用途及與 HSTS 的差異。</p></li>
+            <li id="ref-zap"><a href="https://www.zaproxy.org/docs/alerts/10055/" target="_blank" rel="noopener noreferrer">ZAP — CSP alerts ↗</a><p>常見政策問題；另見 <a href="https://www.zaproxy.org/docs/alerts/10038/" target="_blank" rel="noopener noreferrer">CSP 標頭／Report-Only 檢查</a>。</p></li>
+          </ol>
+        </section>
+        <div class="primer-finish"><div><p class="eyebrow">PUT IT INTO PRACTICE</p><h2>把理解，帶回你的政策。</h2><p>從基線或現有 CSP 起步，逐項確認來源、用途與影響。</p></div><a class="button mint" href="index.html#editor">開啟 CSP 工作台 →</a></div>
+      </article>
+    </div>
+    <footer><div><strong>CSP 工作台</strong><span>認識原理，再做設定。</span></div><p>by 鄭郁翰 (Yu-Han Cheng) · <a href="https://github.com/kaoshou/csp-generator" target="_blank" rel="noopener noreferrer">GitHub ↗</a> · <a href="#sources">來源</a> · <a href="#primer-title">回到頂端 ↑</a></p></footer>
+  </main>
+</body>
+</html>

@@ -4,6 +4,8 @@
 
 既有線上站點：[csp.yuhan.tw](https://csp.yuhan.tw/) · [GitHub Pages](https://kaoshou.github.io/csp-generator/)
 
+[認識 CSP：發展歷史、用途與安全原理](https://csp.yuhan.tw/about-csp.html) — 包含 CSP 出現前的 SOP、輸出編碼、HTML 清理、HttpOnly 與歷史 XSS 過濾器，說明 XSS 的信任缺口、CSP 的補強、標準演進與實務限制；附段落來源編號及完整參考資料。也可從首頁「認識 CSP」或學習指南另開介紹頁，保留原分頁草稿。
+
 ## 可以做什麼
 
 - **從需求開始**：靜態網站、前後端分離、第三方字型／影片、nonce 嚴格政策，以及從全部封鎖開始的課堂練習。套用前顯示可能影響，不會自動掃描或修改網站。
@@ -54,7 +56,7 @@ node --check scripts/catalog.js
 
 ## 部署這個工具
 
-保留 `index.html`、`styles.css`、`scripts/catalog.js`、`scripts/core.js`、`scripts/guidance.js`、`scripts/app.js` 與 `assets/` 的相對路徑，直接部署靜態檔案即可。原有 GitHub Pages 使用 `main` 根目錄，`CNAME` 保留 `csp.yuhan.tw`。不需要註冊服務或設定密鑰。HTML 的資產版本參數避免不同版本的腳本被快取混用。
+保留 `index.html`、`about-csp.html`、`styles.css`、`primer.css`、`scripts/catalog.js`、`scripts/core.js`、`scripts/guidance.js`、`scripts/app.js` 與 `assets/` 的相對路徑，直接部署靜態檔案即可。原有 GitHub Pages 使用 `main` 根目錄，`CNAME` 保留 `csp.yuhan.tw`。不需要註冊服務或設定密鑰。HTML 的資產版本參數避免不同版本的腳本被快取混用。
 
 工具自己使用外部同源 CSS/JS，沒有行內事件處理器。若替工具加上 CSP，需在實際主機設定回應標頭；GitHub Pages 不提供在 repository 檔案中自訂任意 HTTP 回應標頭的能力，需由支援的代理或主機處理。不要將產生的待測政策直接套在工具自身頁面上。
 
