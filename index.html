@@ -7,11 +7,11 @@
   <meta name="color-scheme" content="light">
   <title>CSP 工作台｜建立政策，也理解影響</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=2.1.0">
-  <script defer src="scripts/catalog.js?v=2.1.0"></script>
-  <script defer src="scripts/core.js?v=2.1.0"></script>
-  <script defer src="scripts/guidance.js?v=2.1.0"></script>
-  <script defer src="scripts/app.js?v=2.1.0"></script>
+  <link rel="stylesheet" href="styles.css?v=2.1.1">
+  <script defer src="scripts/catalog.js?v=2.1.1"></script>
+  <script defer src="scripts/core.js?v=2.1.1"></script>
+  <script defer src="scripts/guidance.js?v=2.1.1"></script>
+  <script defer src="scripts/app.js?v=2.1.1"></script>
 </head>
 <body>
   <a class="skip" href="#main">跳至主要內容</a>
@@ -21,7 +21,7 @@
   </header>
   <main id="main" class="shell">
     <section class="hero" aria-labelledby="hero-title">
-      <div><p class="eyebrow"><span class="live-dot"></span> SECURITY ENGINEERING / CSP WORKBENCH</p><h1 id="hero-title">精準定義信任，<br><span>看懂每一項安全決策。</span></h1><p class="hero-description">從建議基線到第三方整合，建立可解釋、可驗證、可持續編輯的 Content Security Policy。</p><div class="hero-actions"><button class="button mint" data-scenario="baseline">從建議基線開始 <span aria-hidden="true">→</span></button><button class="button hero-secondary" data-go="guidance">查看常見整合</button></div></div>
+      <div><p class="eyebrow"><span class="live-dot"></span> SECURITY ENGINEERING / CSP WORKBENCH</p><h1 id="hero-title">精準定義信任，<br><span>看懂每一項安全決策。</span></h1><p class="hero-description">從建議基線到第三方整合，建立可解釋、可驗證、可持續編輯的 Content Security Policy。</p><div class="hero-actions"><button class="button mint" data-scenario="baseline">從建議基線開始 <span aria-hidden="true">→</span></button><button class="button hero-secondary" data-go="guidance">查看常見整合</button><a class="button hero-secondary" href="about-csp.html" target="_blank" rel="noopener noreferrer" aria-label="認識 CSP：發展歷史與原理（另開分頁）">認識 CSP <span aria-hidden="true">↗</span></a></div></div>
       <div class="hero-console" aria-label="政策工作流程示意"><div class="console-top"><span><i></i><i></i><i></i></span><code>policy.workflow</code><span>LOCAL</span></div><div class="console-body"><p><span class="console-line">01</span><em>define</em> trusted_sources</p><p><span class="console-line">02</span><em>review</em> integration_changes</p><p><span class="console-line">03</span><em>observe</em> compatibility</p><p><span class="console-line">04</span><em>enforce</em> verified_policy</p><div class="console-comment">// 先理解影響，再逐步啟用防護</div></div></div>
     </section>
     <div class="workbench-status" aria-label="目前草稿狀態"><div><span class="status-icon" aria-hidden="true">≡</span><span>啟用規則<strong id="session-rule-count">9 項</strong></span></div><div><span class="status-icon" aria-hidden="true">◉</span><span>目前模式<strong id="session-mode">Report-Only</strong></span></div><div><span class="status-icon" aria-hidden="true">⌁</span><span>規則檢查<strong id="session-checks">等待檢查</strong></span></div><div><span class="status-icon" aria-hidden="true">⌘</span><span>資料處理<strong>本機處理 · 無上傳</strong></span></div></div>
@@ -83,6 +83,7 @@
       <div class="inline-actions"><button class="button dark" data-go="editor">回到政策設定</button><button class="button subtle" data-action="download-project">先下載專案備份 ↓</button></div>
     </section>
     <section id="view-learn" class="view" aria-labelledby="learn-heading" hidden>
+      <section class="panel classroom"><div><p class="eyebrow">UNDERSTAND THE BACKGROUND</p><h3>CSP 之前用什麼？它為什麼出現？</h3><p>從原有防線、XSS 問題與發展歷史，完整認識 CSP 的用途、運作及限制。文章附就近來源與完整參考資料。</p></div><a class="button dark" href="about-csp.html" target="_blank" rel="noopener noreferrer" aria-label="閱讀 CSP 完整介紹（另開分頁）">閱讀完整介紹 ↗</a></section>
       <div class="page-intro"><p class="eyebrow">LEARN BY DOING</p><h2 id="learn-heading">不只產生一串字，也知道它代表什麼。</h2><p>CSP 是瀏覽器執行的額外防線；它不會清理輸入，也不能取代修補 XSS、權限控制或安全的程式碼。</p></div>
       <div class="lesson-grid"><article class="panel lesson"><span class="lesson-label">基本觀念</span><h3>每個指令，是一類資源的規則</h3><pre>default-src 'self';
 img-src 'self' https://images.example;
