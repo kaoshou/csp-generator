@@ -3,4 +3,8 @@ exclude:
   - tests
   - docs
   - package.json
+  - package-lock.json
+  - playwright.config.cjs
+  - node_modules
+  - test-results
   - scripts/serve.cjs

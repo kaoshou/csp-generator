@@ -223,6 +223,12 @@ summary::-webkit-details-marker { display: none; }
 .rollout-card h3 { margin: 18px 0 12px; }
 .rollout-card p { font-size: 12px; color: var(--muted); line-height: 1.9; }
 .rollout-card label { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 20px; }
+.rollout-record { margin-bottom: 24px; }
+.rollout-record > p, .rollout-record details { font-size: 13px; line-height: 1.7; color: var(--muted); }
+.rollout-record summary { cursor: pointer; color: var(--teal); }
+.rollout-flows { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 14px 20px; margin: 18px 0; }
+.rollout-flows label { display: grid; gap: 6px; font-size: 13px; }
+.rollout-flows small { font-size: 12px; color: var(--muted); }
 .step-number { font: 26px var(--mono); color: #66a18d; }
 .table-wrap { overflow: auto; }
 table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; min-width: 640px; }
@@ -505,4 +511,17 @@ dialog textarea { margin-top: 7px; }
   .topbar, .workspace-nav, .scenario-section, .filter-toolbar, .filter-tabs, .history-actions, .header-actions, .output-actions, .local-save-row, .next-step, .toast, dialog { display: none !important; }
   .shell { padding: 0; } .workspace-grid { display: block; } .output-column { position: static; } .output-panel { background: white; color: black; box-shadow: none; border: 1px solid #aaa; margin-top: 20px; }
   .output-panel textarea { color: black; background: white; border: 0; } .output-panel .eyebrow, .output-note, .output-footnote { color: #444; } .rule-card { break-inside: avoid; } footer { margin-top: 20px; }
+}
+
+.task-picker { width: min(100%, 340px); padding: 20px; border: 1px solid #496679; background: #112539; border-radius: 12px; }
+.task-picker label { display: block; margin-bottom: 8px; color: #eaf6fa; font-weight: 650; }
+.task-picker select { width: 100%; min-width: 0; margin-bottom: 12px; }
+.finding-list { list-style: none; padding: 0; }
+.finding-list li { padding: 10px 12px; margin: 6px 0; background: #f2f6fa; border-left: 3px solid #64849b; overflow-wrap: anywhere; }
+.finding-list li > div { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; font-size: 12px; }
+.finding-list a, .finding-list button { font-size: 12px; }
+#finding-input { width: 100%; }
+@media (max-width: 760px) {
+  .hero { flex-direction: column; align-items: stretch; }
+  .task-picker { width: 100%; padding: 14px; }
 }

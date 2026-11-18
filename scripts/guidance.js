@@ -65,25 +65,68 @@
     }
     return {project:next,changes,notes:[...new Set(notes)],conflicts};
   }
+  function broadSource(value) {
+    return value === '*' || /^(?:https?|data):$/.test(value) || value.includes('*.') || /^[a-z][a-z0-9+.-]*:\/\/\*/i.test(value);
+  }
+
+  function assessmentDetails(project, row, issues) {
+    if (row.status === 'configured') return [];
+    const targets = {
+      default: ['default-src'], scripts: ['script-src', 'script-src-elem', 'script-src-attr'],
+      styles: ['style-src-elem', 'style-src-attr'], objects: ['object-src'], base: ['base-uri'],
+      ancestors: ['frame-ancestors'], forms: ['form-action']
+    };
+    if (row.id === 'syntax') {
+      return issues.filter(i => i.level === 'error' || /未收錄|過時/.test(i.message))
+        .map(i => ({ directive: i.directive, value: i.message, rule: null }));
+    }
+    const details = new Map();
+    for (const target of targets[row.id] || []) {
+      const effective = C.effectiveDirective(project.directives, target);
+      const directive = effective.name || target;
+      const record = (value, rule) => {
+        const key = JSON.stringify([directive, value, rule]);
+        if (!details.has(key)) details.set(key, { directive, value, rule, targets: [] });
+        details.get(key).targets.push(target);
+      };
+      if (!effective.name) {
+        record('未設定', ['base', 'ancestors', 'forms'].includes(row.id) ? '10055-13' : null);
+        continue;
+      }
+      for (const value of effective.values) {
+        // script-src is consulted separately here for eval. Element and
+        // attribute checks below use their own fallback chains.
+        if (target === 'script-src' && value !== "'unsafe-eval'") continue;
+        if (broadSource(value)) record(value, value.includes('*') ? '10055-4' : null);
+        else if (value === "'unsafe-inline'" && ['scripts','styles'].includes(row.id)) record(value, row.id === 'scripts' ? '10055-5' : '10055-6');
+        else if (value === "'unsafe-hashes'" && ['scripts','styles'].includes(row.id)) record(value, row.id === 'scripts' ? '10055-7' : '10055-8');
+        else if (value === "'unsafe-eval'" && target === 'script-src') record(value, '10055-10');
+        else if (row.id === 'objects' || (value.startsWith("'unsafe-") && !['scripts','styles'].includes(row.id))) record(value, null);
+      }
+    }
+    return [...details.values()];
+  }
+
   function assessBaseline(project){
     const d=project.directives,own=name=>Object.hasOwn(d,name),effective=name=>C.effectiveDirective(d,name).values;
-    const wide=values=>values?.some(v=>v==='*'||/^(?:https?|data):$/.test(v)||v.includes('*.')||/^[a-z][a-z0-9+.-]*:\/\/\*/i.test(v));
+    const wide=values=>values?.some(broadSource);
     const risky=values=>!values||wide(values)||values.some(v=>["'unsafe-inline'","'unsafe-eval'","'unsafe-hashes'"].includes(v));
     const row=(id,title,status,message,reference)=>({id,title,status,message,reference});
     const explicit=(id,name,title)=>row(id,title,!own(name)?'missing':risky(d[name])?'review':'configured',!own(name)?`${name} 不繼承 default-src，請明確設定。`:`目前 ${name}：${d[name].join(' ')||'空清單'}。請確認符合實際流程與部署。`,'https://www.zaproxy.org/docs/alerts/10055-13/');
     const scriptRules=['script-src-elem','script-src-attr'].map(effective),styleRules=['style-src-elem','style-src-attr'].map(effective);
     const evalRule=effective('script-src');
-    const scriptRisk=scriptRules.some(risky)||risky(evalRule);
+    const riskyInline = values => !values || wide(values) || values.some(v => ["'unsafe-inline'", "'unsafe-hashes'"].includes(v));
+    const scriptRisk=scriptRules.some(riskyInline)||!evalRule||evalRule.includes("'unsafe-eval'");
     const issues=C.validate(project);
     return [
       row('delivery','正式 HTTP 標頭與模式',project.mode==='enforce'?'verify':'review',project.mode==='enforce'?'草稿已選強制模式，但仍需在 Network／HTTP 回應中確認實際送出 Content-Security-Policy；此工具不連線檢查網站。':'目前是 Report-Only。適合測試，但不強制阻擋；掃描器可能仍回報 CSP 未強制啟用。','https://www.zaproxy.org/docs/alerts/10038/'),
       row('default','預設資源邊界',!own('default-src')?'missing':risky(d['default-src'])?'review':'configured','明確設定 default-src 並避免 *、整個 https: 或可執行 data: 的過寬信任。個別指令會取代此清單。','https://www.zaproxy.org/docs/alerts/10055-4/'),
       row('scripts','腳本與行內事件',scriptRisk?'review':'configured','檢查 script-src、script-src-elem、script-src-attr 的有效規則及 eval。避免 unsafe-inline／unsafe-eval／unsafe-hashes；來源白名單仍有繞過風險，需評估 nonce/hash strict CSP。','https://www.zaproxy.org/docs/alerts/10055/'),
-      row('styles','樣式與行內屬性',styleRules.some(risky)?'review':'configured','分別確認 style 元素與 style 屬性的有效規則。unsafe-inline 也常被掃描器提示，但不能直接等同 JavaScript 的執行風險。','https://www.zaproxy.org/docs/alerts/10055-6/'),
+      row('styles','樣式與行內屬性',styleRules.some(riskyInline)?'review':'configured','分別確認 style 元素與 style 屬性的有效規則。unsafe-inline 也常被掃描器提示，但不能直接等同 JavaScript 的執行風險。','https://www.zaproxy.org/docs/alerts/10055-6/'),
       row('objects','停用不需要的外掛',!effective('object-src')?'missing':effective('object-src').length===0||effective('object-src').length===1&&effective('object-src')[0]==="'none'"?'configured':'review','未使用 object/embed 時，建議 object-src none；此項可回退到 default-src，但明列更容易檢查。','https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/object-src'),
       explicit('base','base-uri','限制 base 網址改寫'),explicit('ancestors','frame-ancestors','防止非預期的網站嵌入'),explicit('forms','form-action','限制表單目的地'),
       row('syntax','語法、舊指令與相容性',issues.some(i=>i.level==='error'||/未收錄|過時/.test(i.message))?'review':'configured','確認 ASCII 語法、有效關鍵字與目前支援的指令。require-sri-for 等舊指令不能代替實際 SRI；meta 也不能取代所有 HTTP 標頭功能。','https://www.zaproxy.org/docs/alerts/10055/')
-    ];
+    ].map(item => ({ ...item, details: assessmentDetails(project, item, issues) }));
   }
   return {recipes,proposeRecipe,assessBaseline};
 });

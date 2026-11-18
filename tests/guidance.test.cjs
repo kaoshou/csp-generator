@@ -94,3 +94,11 @@ test('copying default-src fallback excludes executable-only tokens for non-scrip
     if(target!=='style-src-elem') assert.ok(!result.project.directives[target].includes("'nonce-YWJjZA=='"),id);
   }
 });
+test('scanner details follow the effective rule and distinguish eval from element loading', () => {
+  const p = C.createProject('baseline');
+  p.directives = { 'default-src': ["'self'", "'unsafe-eval'"], 'script-src-elem': ["'none'"], 'script-src-attr': ["'none'"] };
+  const rows = G.assessBaseline(p);
+  const scripts = rows.find(row => row.id === 'scripts');
+  assert.deepEqual(scripts.details, [{ directive: 'default-src', value: "'unsafe-eval'", rule: '10055-10', targets: ['script-src'] }]);
+  assert.equal(rows.find(row => row.id === 'styles').status, 'configured');
+});

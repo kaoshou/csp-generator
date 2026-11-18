@@ -18,3 +18,18 @@ jobs:
       - run: node --check scripts/catalog.js
       - run: node --check scripts/guidance.js
       - run: node --check tests/browser.js
+  browser:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ matrix.engine }}
+      - run: npm run test:browser -- --project=${{ matrix.engine }}

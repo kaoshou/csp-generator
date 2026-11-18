@@ -4,7 +4,7 @@
 
 既有線上站點：[csp.yuhan.tw](https://csp.yuhan.tw/) · [GitHub Pages](https://kaoshou.github.io/csp-generator/)
 
-[認識 CSP：發展歷史、用途與安全原理](https://csp.yuhan.tw/about-csp.html) — 包含 CSP 出現前的 SOP、輸出編碼、HTML 清理、HttpOnly 與歷史 XSS 過濾器，說明 XSS 的信任缺口、CSP 的補強、標準演進與實務限制；附段落來源編號及完整參考資料。也可從首頁「認識 CSP」或學習指南另開介紹頁，保留原分頁草稿。
+[認識 CSP：發展歷史、用途與安全原理](https://csp.yuhan.tw/about-csp.html) — 包含 CSP 出現前的 SOP、輸出編碼、HTML 清理、HttpOnly 與歷史 XSS 過濾器，說明 XSS 的信任缺口、CSP 的補強、標準演進與實務限制；附段落來源編號及完整參考資料。也可從首頁「學習 CSP」或學習指南另開介紹頁，保留原分頁草稿。
 
 ## 可以做什麼
 
@@ -19,6 +19,8 @@
 - **理解預期結果**：模擬 URL、行內內容、nonce/hash 與 eval，說明命中的來源規則和觀察模式差異。超出模型範圍時明確提示實測。
 - **部署與教學**：備份、觀察、流程驗證、逐步強制、回復方案、故障對照表、基本觀念與課堂練習。
 - **本機資料**：SHA-256／SHA-384／SHA-512 內容雜湊、明確選擇的瀏覽器草稿與 JSON 備份。無追蹤、外部字型、後端或執行期套件。
+
+首頁提供建立、貼入、學習三個入口，也可依 iframe、Maps JavaScript API 或 CDN 需求直接前往對應設定。弱掃對照會列出命中的值、回退關係及相關 ZAP 規則，可跳到編輯器或先預覽調整。加入雜湊時可比較保留來源與只使用該雜湊的結果。安全上線頁的勾選及各流程驗證結果可隨 JSON 保存，政策改變後會提示需重測的流程。
 
 ## 使用流程
 
@@ -52,7 +54,17 @@ node --check scripts/catalog.js
 
 自動測試涵蓋匯入／輸出往返、JSON 格式、重複／空指令、CSP fallback、來源／路徑／連接埠匹配、行內腳本、hash、sandbox 與伺服器輸出字元處理。瀏覽器驗證紀錄見 [docs/verification.md](docs/verification.md)。
 
-啟動本機伺服器後，開啟 <http://127.0.0.1:4173/tests/browser.html> 執行 15 組瀏覽器回歸測試，涵蓋真實瀏覽器 File／DataTransfer、UI 事件與非同步雜湊；僅操作 iframe 中產生的測試資料，不選取本機檔案。`_config.yml` 將測試與開發文件排除於 GitHub Pages 正式輸出。
+啟動本機伺服器後，亦可開啟 <http://127.0.0.1:4173/tests/browser.html> 手動執行瀏覽器回歸測試，涵蓋真實瀏覽器 File／DataTransfer、UI 事件與非同步雜湊；僅操作 iframe 中產生的測試資料，不選取本機檔案。`_config.yml` 將測試與開發文件排除於 GitHub Pages 正式輸出。
+
+GitHub Actions 在 push 與 PR 以 Chromium、Firefox、WebKit 執行瀏覽器回歸。於本機執行同一套測試：
+
+```sh
+npm ci
+npx playwright install
+npm run test:browser
+```
+
+以環境變數 `CSP_BASE_URL` 指定正式站網址可重跑部署驗證。測試工具於獨立瀏覽器環境提供測試頁，工作台 HTML、CSS 與執行時腳本從指定站點載入。
 
 ## 部署這個工具
 

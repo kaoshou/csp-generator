@@ -20,6 +20,10 @@
   function commit(change, key) {
     const next = C.clone(project);
     change(next);
+    C.updateRollout(project, next);
+    replaceProject(next, key);
+  }
+  function replaceProject(next, key) {
     if (JSON.stringify(next) === JSON.stringify(project)) return;
     const now = Date.now();
     if (!key || lastEdit.key !== key || now - lastEdit.time > 900) {
@@ -60,6 +64,7 @@
     updateCards();
     renderChanges();
     renderGuidance();
+    renderRollout();
     if (hasSimulated) simulate();
   }
   function renderOutput() {
@@ -77,7 +82,7 @@
       nginx: '先備份設定並執行 nginx -t；確認 server/location 的標頭繼承與實際回應。',
       apache: '需 mod_headers。先檢查語法，再確認 CDN/Proxy 沒有加上另一份政策。',
       meta: 'meta 功能有限，僅影響它之後載入的內容。優先使用 HTTP 標頭。',
-      json: '完整保存模式、網站來源、回報端點與政策。可保留未修正的草稿。'
+      json: '保存政策、模式、網站來源、回報端點、上線檢查與流程實測紀錄。可保留未修正的草稿。'
     };
     $('output-note').textContent = valid ? notes[format] : '目前無法匯出此格式。仍可用「儲存專案」保留草稿，修正後再部署。';
   }
@@ -152,6 +157,48 @@
     }
     $('policy-changes').textContent = changes.join('\n') || '規則尚無變更。模式與回報端點請另外確認。';
   }
+  const flowStatusLabels = { pending: '待測', pass: '通過', fail: '失敗', retest: '需重測' };
+  function initRollout() {
+    for (const { id, title, rules } of C.rolloutFlows) {
+      const label = document.createElement('label');
+      label.textContent = title;
+      const select = document.createElement('select');
+      select.dataset.rolloutFlow = id;
+      for (const [value, caption] of Object.entries(flowStatusLabels)) {
+        const option = new Option(caption, value);
+        option.disabled = value === 'retest';
+        select.add(option);
+      }
+      label.append(select);
+      const note = document.createElement('small');
+      note.id = 'rollout-note-' + id;
+      select.setAttribute('aria-describedby', note.id);
+      const item = document.createElement('div');
+      item.append(label, note);
+      $('rollout-flows').append(item);
+      if (rules) {
+        const li = document.createElement('li');
+        li.textContent = title + ' · ' + rules.join('、');
+        $('rollout-dependencies').append(li);
+      }
+    }
+  }
+  function renderRollout() {
+    const { revision, checks, flows } = project.rollout;
+    $('rollout-revision').textContent = '政策第 ' + revision + ' 版';
+    for (const input of document.querySelectorAll('[data-rollout-check]')) input.checked = checks[input.dataset.rolloutCheck];
+    const counts = { pending: 0, pass: 0, fail: 0, retest: 0 };
+    for (const select of $('rollout-flows').querySelectorAll('select')) {
+      const id = select.dataset.rolloutFlow;
+      const { status, testedRevision, needsRetest } = flows[id];
+      const display = needsRetest ? 'retest' : status;
+      counts[display]++;
+      select.value = display;
+      $('rollout-note-' + id).textContent = testedRevision === null ? ''
+        : '第 ' + testedRevision + ' 版實測' + flowStatusLabels[status] + (needsRetest ? '，請重新測試並選擇結果。' : '');
+    }
+    $('rollout-summary').textContent = Object.entries(counts).map(([status, count]) => flowStatusLabels[status] + ' ' + count + ' 項').join(' · ');
+  }
   function showView(view, focus = false) {
     if (!['editor', 'guidance', 'simulator', 'rollout', 'learn'].includes(view)) view = 'editor';
     document.querySelectorAll('.view').forEach(section => { section.hidden = section.id !== 'view-' + view; });
@@ -173,8 +220,57 @@
   function renderGuidance() {
     const labels = { configured: '草稿已設定', review: '需評估', missing: '尚未明列', verify: '待驗證回應' };
     $('assessment-mode').textContent = project.mode === 'report-only' ? 'REPORT-ONLY 草稿' : 'ENFORCE 草稿';
-    $('baseline-assessment').innerHTML = G.assessBaseline(project).map(row => `<article class="assessment-row"><span class="assessment-symbol ${row.status}" aria-hidden="true">${row.status === 'configured' ? '✓' : row.status === 'missing' ? '−' : '!'}</span><div><strong>${escape(row.title)}</strong><p>${escape(row.message)}</p><a href="${escape(row.reference)}" target="_blank" rel="noopener noreferrer">檢查依據 ↗</a></div><span class="assessment-status ${row.status}">${labels[row.status]}</span></article>`).join('');
+    $('baseline-assessment').innerHTML = G.assessBaseline(project).map(row => {
+      const findings = row.details.map(detail => {
+        const name = escape(detail.directive);
+        const affected = (detail.targets || []).filter(target => target !== detail.directive);
+        const rule = detail.rule ? `<a href="https://www.zaproxy.org/docs/alerts/${detail.rule}/" target="_blank" rel="noopener noreferrer">相關 ZAP ${detail.rule} ↗</a>` : '工作台檢查';
+        const edit = catalog.byName[detail.directive] || owns(project.directives, detail.directive);
+        return `<li><code>${name} · ${escape(detail.value)}</code>${affected.length ? `<p>提供回退規則給 ${escape(affected.join('、'))}</p>` : ''}<div>${rule}
+          ${edit ? `<button class="text-button" data-edit-finding="${name}">前往編輯</button>` : ''}
+          ${catalog.byName[detail.directive]?.kind === 'sources' ? `<button class="text-button" data-preview-finding="${name}">預覽修改影響</button>` : ''}</div></li>`;
+      }).join('');
+      const delivery = row.id === 'delivery' ? `<code>${project.mode === 'report-only' ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy'}</code>
+        ${project.mode === 'report-only' ? '<a href="https://www.zaproxy.org/docs/alerts/10038-3/" target="_blank" rel="noopener noreferrer">相關 ZAP 10038-3 ↗</a>' : ''}
+        <button class="text-button" data-go="rollout">查看上線驗證</button>` : '';
+      return `<article class="assessment-row"><span class="assessment-symbol ${row.status}" aria-hidden="true">${row.status === 'configured' ? '✓' : row.status === 'missing' ? '−' : '!'}</span><div><strong>${escape(row.title)}</strong><p>${escape(row.message)}</p>${findings ? '<ul class="finding-list">' + findings + '</ul>' : ''}<a href="${escape(row.reference)}" target="_blank" rel="noopener noreferrer">檢查依據 ↗</a> ${delivery}</div><span class="assessment-status ${row.status}">${labels[row.status]}</span></article>`;
+    }).join('');
   }
+  let findingName;
+  function previewFinding() {
+    const next = C.clone(project);
+    const values = $('finding-input').value.trim().split(/\s+/).filter(Boolean);
+    next.directives[findingName] = values;
+    const previous = C.effectiveDirective(project.directives, findingName).values || [];
+    const removed = previous.filter(value => !values.includes(value));
+    const added = values.filter(value => !previous.includes(value));
+    const affected = catalog.directives.filter(d => d.kind === 'sources' &&
+      C.effectiveDirective(next.directives, d.name).name === findingName).map(d => d.name);
+    const errors = C.validate(next).filter(issue => issue.directive === findingName && issue.level === 'error');
+    $('finding-after').textContent = C.serializePolicy({ [findingName]: values });
+    $('finding-impact').textContent = errors.length ? errors.map(issue => issue.message).join(' ') :
+      [removed.length ? '移除：' + removed.join(' ') + '。' : '', added.length ? '新增：' + added.join(' ') + '。' : '',
+        values.length ? '' : '空清單會封鎖這類資源。', catalog.byName[findingName].impact,
+        '使用此清單的指令：' + affected.join('、')].filter(Boolean).join(' ');
+    $('finding-apply').disabled = errors.length > 0 || JSON.stringify(values) === JSON.stringify(project.directives[findingName]);
+    return values;
+  }
+  $('finding-input').addEventListener('input', previewFinding);
+  $('finding-apply').addEventListener('click', () => {
+    const values = previewFinding();
+    if ($('finding-apply').disabled) return;
+    commit(p => { p.directives[findingName] = values; });
+    $('finding-dialog').close();
+    toast('已更新 ' + findingName + '，可在建立政策中復原。');
+  });
+  $('open-task').addEventListener('click', () => {
+    const task = $('task-choice').value;
+    if (task === 'maps-js') {
+      showView('guidance');
+      $('maps-js-guide').focus();
+      $('maps-js-guide').scrollIntoView({ block: 'center' });
+    } else openRecipe(task);
+  });
   function renderRecipeCards() {
     const query = $('recipe-search').value.trim().toLowerCase();
     const matches = G.recipes.filter(recipe => `${recipe.title} ${recipe.subtitle} ${recipe.category} ${recipe.description} ${recipe.notes.join(' ')}`.toLowerCase().includes(query));
@@ -236,6 +332,7 @@
         const parsed = C.parsePolicy(text);
         warnings = parsed.warnings;
         candidate = { ...C.clone(project), directives: parsed.directives, mode: parsed.mode || project.mode, reportingEndpoint: parsed.reportingEndpoint || '' };
+        C.updateRollout(project, candidate);
       }
       const issues = C.validate(candidate);
       const errors = issues.filter(i => i.level === 'error').length;
@@ -279,6 +376,26 @@
   document.addEventListener('click', event => {
     const button = event.target.closest('button, a');
     if (!button) return;
+    if (button.dataset.previewFinding) {
+      findingName = button.dataset.previewFinding;
+      const current = C.effectiveDirective(project.directives, findingName);
+      $('finding-title').textContent = '預覽修改 ' + findingName;
+      $('finding-before').textContent = current.name ? '目前生效：' + C.serializePolicy({ [current.name]: current.values }) : '目前未限制此類資源。';
+      $('finding-input').value = (current.values || []).join(' ');
+      previewFinding();
+      $('finding-dialog').showModal();
+    }
+    if (button.dataset.editFinding) {
+      const name = button.dataset.editFinding;
+      $('rule-search').value = '';
+      $('enabled-only').checked = false;
+      document.querySelector('[data-group="全部"]').click();
+      showView('editor');
+      const card = [...document.querySelectorAll('.rule-card')].find(item => item.dataset.rule === name);
+      card.open = true;
+      (card.querySelector('textarea:not(:disabled)') || card.querySelector('[data-enable]')).focus();
+      card.scrollIntoView({ block: 'center' });
+    }
     if (button.dataset.action === 'open-import') { event.preventDefault(); invalidateImport(); $('import-dialog').showModal(); $('import-text').focus(); }
     if (button.dataset.action === 'download-project') download(C.exportProject(project), fileStem() + '.csp.json', true);
     if (button.dataset.action === 'jump-output') { $('policy-output').scrollIntoView({ block: 'center' }); $('policy-output').focus({ preventScroll: true }); }
@@ -316,6 +433,14 @@
     }
   });
   $('project-name').addEventListener('input', event => commit(p => { p.name = event.target.value; }, 'name'));
+  $('view-rollout').addEventListener('change', event => {
+    const { rolloutCheck, rolloutFlow } = event.target.dataset;
+    if (owns(project.rollout.checks, rolloutCheck)) commit(p => { p.rollout.checks[rolloutCheck] = event.target.checked; });
+    if (owns(project.rollout.flows, rolloutFlow) && ['pending', 'pass', 'fail'].includes(event.target.value)) {
+      const status = event.target.value;
+      commit(p => { p.rollout.flows[rolloutFlow] = { status, testedRevision: status === 'pending' ? null : p.rollout.revision, needsRetest: false }; });
+    }
+  });
   $('project-origin').addEventListener('input', event => commit(p => { p.origin = event.target.value.trim(); }, 'origin'));
   $('reporting-endpoint').addEventListener('input', event => commit(p => { p.reportingEndpoint = event.target.value.trim(); }, 'reporting'));
   $('rule-search').addEventListener('input', updateCards);
@@ -360,7 +485,7 @@
   $('apply-import').addEventListener('click', () => {
     if (!candidate) return;
     const next = C.clone(candidate); baseline = C.clone(next.directives);
-    commit(p => Object.assign(p, next));
+    replaceProject(next);
     candidate = null; $('import-dialog').close(); renderRules(); renderChanges(); showView('editor'); toast('已匯入政策；可繼續編輯，或使用復原還原。');
   });
   $('apply-scenario').addEventListener('click', () => {
@@ -379,12 +504,42 @@
     try { const value = await C.hashSource(text, algorithm); if (text !== $('hash-content').value || algorithm !== $('hash-algorithm').value) return; hash = value; $('hash-result').textContent = value; $('add-hash').disabled = false; }
     catch (error) { toast(error.message); }
   });
-  $('add-hash').addEventListener('click', () => { if (!hash) return; const name = $('hash-target').value; commit(p => { p.directives[name] = [...new Set([...(p.directives[name] || []).filter(v => v !== "'none'"), hash])]; }); toast('已將 hash 加入 ' + name + '。'); });
+  function renderHashPreview() {
+    const name = $('hash-target').value;
+    const preview = C.proposeHash(project.directives, name, hash, $('hash-strategy').value);
+    $('hash-before').textContent = preview.before.name
+      ? C.serializePolicy({ [preview.before.name]: preview.before.values }) + (!preview.before.values.length ? '（空清單，封鎖）' : '')
+      : '未設定來源限制';
+    $('hash-after').textContent = C.serializePolicy({ [name]: preview.after });
+    $('hash-policy').textContent = C.serializePolicy({ ...project.directives, [name]: preview.after }).split('; ').join(';\n');
+    $('hash-impact').replaceChildren(...preview.notes.map(note => {
+      const li = document.createElement('li');
+      li.textContent = note;
+      return li;
+    }));
+    $('apply-hash').disabled = !hash || !preview.canApply;
+    return preview;
+  }
+  $('add-hash').addEventListener('click', () => {
+    if (!hash) return;
+    $('hash-strategy').value = 'preserve';
+    renderHashPreview();
+    $('hash-dialog').showModal();
+  });
+  $('hash-strategy').addEventListener('change', renderHashPreview);
+  $('apply-hash').addEventListener('click', () => {
+    const preview = renderHashPreview();
+    if (!hash || !preview.canApply) return;
+    const name = $('hash-target').value;
+    commit(p => { p.directives[name] = preview.after; });
+    $('hash-dialog').close();
+    toast('已套用 ' + name + ' 的雜湊規則，可按「復原」還原。');
+  });
   $('run-simulation').addEventListener('click', simulate);
   $('sim-type').addEventListener('change', syncSimulationKind);
   $('sim-kind').addEventListener('change', syncSimulationKind);
   for (const id of ['sim-url', 'sim-nonce', 'sim-hash', 'sim-dynamic']) $(id).addEventListener('input', () => { if (hasSimulated) simulate(); });
   window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
   $('baseline-snippet').textContent = C.serializePolicy(C.createProject('baseline').directives).split('; ').join(';\n');
-  renderRecipeCards(); renderRules(true); renderDerived(); refreshStorage(); showView(location.hash.slice(1));
+  initRollout(); renderRecipeCards(); renderRules(true); renderDerived(); refreshStorage(); showView(location.hash.slice(1));
 })();
