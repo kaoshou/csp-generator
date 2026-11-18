@@ -65,6 +65,49 @@ document.getElementById('run').addEventListener('click',async()=>{
     assert(q('#values-x-markup').value.includes('<img/'),'匯入文字應保留');assert(!q('#directives img'),'匯入內容變成了 HTML 圖片');
   });
   await test('未知指令後套情境不會中斷畫面',()=>{click('.hero [data-scenario="baseline"]');click('#apply-scenario');assert(!q('#scenario-dialog').open,'情境套用中斷');assert(!readProject().directives['x-future'],'舊未知指令未替換');});
+  await test('上線流程結果依規則標記重測，可復原並從本機草稿還原',()=>{
+    const original=readProject(),storage=w().localStorage,key='csp-workbench-project-v1',saved=storage.getItem(key);
+    const maps='[data-rollout-flow="maps"]',forms='[data-rollout-flow="forms"]',backup='[data-rollout-check="backup"]';
+    const load=text=>{click('[data-action="open-import"]');fill('#import-text',text);click('#preview-import');click('#apply-import');};
+    try{
+      click('[data-view="rollout"]');click(backup);select(maps,'pass');select(forms,'fail');
+      const tested=readProject();
+      click('#save-local');
+      load("frame-src https://maps.test; "+w().CSPCore.serializePolicy(Object.fromEntries(Object.entries(tested.directives).filter(([name])=>name!=='frame-src'))));
+      assert(q(maps).value==='retest'&&q(forms).value==='fail','框架變更應只提醒相關流程');
+      assert(q('#rollout-note-maps').textContent.includes('通過'),'應保留前次通過紀錄');
+      click('#undo');assert(JSON.stringify(readProject())===JSON.stringify(tested),'未復原政策與實測紀錄');
+      click('#redo');assert(q(maps).value==='retest','重做沒有標示重測');
+      select(maps,'pass');assert(!readProject().rollout.flows.maps.needsRetest,'重新通過後仍顯示過期');
+      select(forms,'pending');click(backup);click('#load-local');click('#apply-import');
+      assert(q(backup).checked&&q(maps).value==='pass'&&q(forms).value==='fail','草稿遺失檢查或流程結果');
+      const malformed=readProject();malformed.rollout.flows.maps.status='bogus';
+      click('[data-action="open-import"]');fill('#import-text',JSON.stringify(malformed));click('#preview-import');
+      assert(q('#apply-import').disabled,'錯誤的流程資料仍可套用');click('#import-dialog [data-close]');
+    }finally{
+      if(saved===null)storage.removeItem(key);else storage.setItem(key,saved);
+      load(JSON.stringify(original));
+    }
+  });
+  await test('雜湊預覽可取消、保留繼承清單或只用雜湊，並可復原',async()=>{
+    const original=JSON.stringify(readProject());
+    click('[data-action="open-import"]');fill('#import-text',"default-src 'self' https://static.test;");click('#preview-import');click('#apply-import');
+    const before=JSON.stringify(readProject());
+    click('[data-view="guidance"]');click('[data-action="open-hash"]');select('#hash-target','script-src-elem');
+    fill('#hash-content','hello');select('#hash-algorithm','SHA-256');click('#calculate-hash');await wait(()=>!q('#add-hash').disabled);
+    const digest="'sha256-LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ='";
+    click('#add-hash');assert(q('#hash-dialog').open,'未開啟預覽');
+    assert(q('#hash-before').textContent==="default-src 'self' https://static.test;",'未列出繼承清單');
+    assert(q('#hash-after').textContent==="script-src-elem 'self' https://static.test "+digest+";",'預設未保留來源');
+    select('#hash-strategy','only');assert(q('#hash-after').textContent==='script-src-elem '+digest+';','只使用雜湊的預覽錯誤');
+    click('#hash-dialog [data-close]');assert(JSON.stringify(readProject())===before,'取消變更了政策');
+    click('#add-hash');click('#apply-hash');
+    assert(JSON.stringify(readProject().directives['script-src-elem'])===JSON.stringify(["'self'",'https://static.test',digest]),'套用結果與預覽不同');
+    click('#undo');assert(JSON.stringify(readProject())===before,'復原未移除新指令');
+    click('#add-hash');select('#hash-strategy','only');click('#apply-hash');
+    assert(JSON.stringify(readProject().directives['script-src-elem'])===JSON.stringify([digest]),'只使用雜湊的套用結果有誤');
+    click('#undo');click('#undo');assert(JSON.stringify(readProject())===original,'未還原測試前政策');
+  });
   await test('SHA-256／384／512 產生及 stale hash 重設',async()=>{
     click('[data-view="guidance"]');click('[data-action="open-hash"]');fill('#hash-content','hello');
     const expected={'SHA-256':"'sha256-LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ='",'SHA-384':"'sha384-WeF0h3dEjGnea4ANejO7+5/xtGPkQ1TDVTvNucZm+pASWjx5+QOXvfX2oT3oKGhP'",'SHA-512':"'sha512-m3HSJL1i83hdltRq0+o9czGb+8KJDKra4t/3JRlnPKcjI8PZm6XBHXx6zG4UuMXaDEZjR1wuXDre9G9zvN7AQw=='"};
@@ -84,6 +127,35 @@ document.getElementById('run').addEventListener('click',async()=>{
   await test('strict-dynamic 阻止只加 CDN 的錯誤調整',()=>{
     click('[data-action="open-import"]');fill('#import-text',"default-src 'self'; script-src 'nonce-YWJjZA==' 'strict-dynamic';");click('#preview-import');click('#apply-import');
     click('[data-view="guidance"]');click('[data-recipe="js-cdn"]');fill('#recipe-url','https://cdn.test/app.js');assert(q('#apply-recipe').disabled,'strict-dynamic 應要求 nonce/SRI');assert(q('#recipe-preview').textContent.includes('strict-dynamic'),'沒有說明衝突');click('#recipe-dialog [data-close]');
+  });
+  await test('首頁分流至地圖 iframe、Maps API、CDN 與匯入',()=>{
+    const before = readProject();
+    for (const recipe of ['youtube', 'youtube-private', 'maps-embed', 'css-cdn', 'js-cdn']) {
+      select('#task-choice', recipe); click('#open-task');
+      assert(q('#recipe-dialog').open, recipe + ' 未開啟');
+      assert(q('#recipe-url-field').hidden === !recipe.endsWith('cdn'), 'CDN URL 欄位錯誤');
+      click('#recipe-dialog [data-close]');
+    }
+    select('#task-choice','maps-js'); click('#open-task');
+    assert(!q('#view-guidance').hidden && d().activeElement.id==='maps-js-guide','應前往 Maps JS 實作說明');
+    click('.hero [data-action="open-import"]'); assert(q('#import-dialog').open,'首頁匯入未開啟');
+    click('#import-dialog [data-close]');
+    assert(JSON.stringify(readProject())===JSON.stringify(before),'查看情境改寫草稿');
+  });
+  await test('弱掃提醒指出命中值，可跳轉、預覽、取消再套用',()=>{
+    const policy = "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'";
+    click('[data-action="open-import"]'); fill('#import-text',policy); click('#preview-import'); click('#apply-import');
+    click('[data-view="guidance"]');
+    assert(q('#baseline-assessment a[href$="/10055-10/"]'),'缺少 unsafe-eval 對照');
+    assert(q('#baseline-assessment a[href$="/10055-6/"]'),'缺少 style unsafe-inline 對照');
+    click('[data-edit-finding="script-src"]');
+    assert(d().activeElement.id==='values-script-src','未定位規則');
+    click('[data-view="guidance"]'); click('[data-preview-finding="script-src"]'); fill('#finding-input',"'self'");
+    assert(q('#finding-after').textContent.includes("script-src 'self'"),'預覽未顯示新規則');
+    click('#finding-dialog [data-close]'); assert(readProject().directives['script-src'].includes("'unsafe-eval'"),'取消應保留設定');
+    click('[data-preview-finding="script-src"]'); fill('#finding-input',"'self'"); click('#finding-apply');
+    assert(readProject().directives['script-src'].join(' ')==="'self'",'套用失敗');
+    click('#undo'); assert(readProject().directives['script-src'].includes("'unsafe-eval'"),'復原失敗');
   });
   document.getElementById('summary').textContent=`完成：${passed} 通過，${failed} 失敗。`;
   button.disabled=false;

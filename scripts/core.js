@@ -13,10 +13,81 @@
   const nonceHash = /^'(?:nonce-[A-Za-z0-9+/_-]+=*|sha(?:256|384|512)-[A-Za-z0-9+/_-]+=*)'$/;
   const hostSource = /^(?:[a-z][a-z0-9+.-]*:\/\/)?(?:\*|\*\.[a-z0-9.-]+|[a-z0-9.-]+)(?::(?:\*|\d+))?(?:\/[^\s;,"'<>?#\\]*)?$/i;
   const schemeSource = /^[a-z][a-z0-9+.-]*:$/i;
+  const rolloutChecks = ['backup', 'response', 'journeys', 'monitoring'];
+  const rolloutFlows = [
+    { id: 'login', title: '登入與登出', rules: ['connect-src', 'form-action', 'frame-src'] },
+    { id: 'payment', title: '付款與返回商店', rules: ['connect-src', 'form-action', 'frame-src'] },
+    { id: 'maps', title: '地圖載入與操作', rules: ['frame-src', 'connect-src', 'img-src', 'worker-src', 'font-src'] },
+    { id: 'search', title: '搜尋與顯示結果', rules: ['connect-src', 'form-action', 'img-src'] },
+    { id: 'upload', title: '檔案上傳與預覽', rules: ['connect-src', 'form-action', 'img-src', 'worker-src', 'object-src'] },
+    { id: 'forms', title: '表單送出與確認', rules: ['form-action', 'connect-src'] },
+    { id: 'video', title: '影片載入與播放', rules: ['media-src', 'frame-src', 'img-src', 'connect-src'] },
+    { id: 'print', title: '列印與預覽', rules: ['font-src', 'img-src', 'frame-src', 'object-src'] },
+    { id: 'mobile', title: '行動版與跨瀏覽器', rules: null }
+  ];
+  const sharedFlowRules = ['script-src', 'script-src-elem', 'script-src-attr', 'style-src-elem', 'style-src-attr'];
+  const documentRules = ['sandbox', 'base-uri', 'frame-ancestors', 'upgrade-insecure-requests', 'trusted-types', 'require-trusted-types-for'];
+  function createRollout() {
+    return {
+      revision: 1,
+      checks: Object.fromEntries(rolloutChecks.map(id => [id, false])),
+      flows: Object.fromEntries(rolloutFlows.map(({ id }) => [id, { status: 'pending', testedRevision: null, needsRetest: false }]))
+    };
+  }
+  function validateRollout(state) {
+    const exactKeys = (record, keys) => record && typeof record === 'object' && !Array.isArray(record)
+      && Object.keys(record).length === keys.length && keys.every(key => own(record, key));
+    const validRevision = value => Number.isSafeInteger(value) && value >= 1;
+    const error = () => new Error('專案的上線檢查或流程驗證紀錄格式不正確。');
+    if (!exactKeys(state, ['revision', 'checks', 'flows']) || !validRevision(state.revision)
+      || !exactKeys(state.checks, rolloutChecks) || !rolloutChecks.every(id => typeof state.checks[id] === 'boolean')
+      || !exactKeys(state.flows, rolloutFlows.map(flow => flow.id))) throw error();
+    for (const record of Object.values(state.flows)) {
+      if (!exactKeys(record, ['status', 'testedRevision', 'needsRetest']) || typeof record.needsRetest !== 'boolean') throw error();
+      if (record.status === 'pending') {
+        if (record.testedRevision !== null || record.needsRetest) throw error();
+      } else if (!['pass', 'fail'].includes(record.status) || !validRevision(record.testedRevision)
+        || record.testedRevision > state.revision || (record.needsRetest && record.testedRevision === state.revision)) throw error();
+    }
+  }
+  function updateRollout(previous, next) {
+    const equalSources = (a, b) => a === b || (Array.isArray(a) && Array.isArray(b)
+      && JSON.stringify([...a].sort()) === JSON.stringify([...b].sort()));
+    const names = new Set([...Object.keys(previous.directives), ...Object.keys(next.directives)]);
+    const changed = [...names].filter(name => {
+      const a = previous.directives[name], b = next.directives[name];
+      return catalog.byName[name]?.kind === 'sources'
+        ? !equalSources(a, b)
+        : JSON.stringify(a) !== JSON.stringify(b);
+    });
+    const changedSite = previous.origin !== next.origin;
+    const changedContext = changedSite || previous.mode !== next.mode;
+    if (!changedContext && !changed.length && previous.reportingEndpoint === next.reportingEndpoint) return;
+    const state = next.rollout;
+    const behaviorChanges = changed.filter(name => name !== 'report-to' && name !== 'report-uri');
+    const affectsAll = changedContext || behaviorChanges.some(name => documentRules.includes(name) || !own(catalog.byName, name));
+    const effectiveChanged = name => !equalSources(effectiveDirective(previous.directives, name).values, effectiveDirective(next.directives, name).values);
+    const sharedChanged = affectsAll || sharedFlowRules.some(effectiveChanged);
+    // Keep old test revisions ordered, even for an imported draft at the JSON integer limit.
+    if (state.revision === Number.MAX_SAFE_INTEGER) {
+      const revisions = [...new Set(Object.values(state.flows).map(r => r.testedRevision).filter(Boolean).concat(state.revision))].sort((a, b) => a - b);
+      for (const record of Object.values(state.flows)) if (record.testedRevision) record.testedRevision = revisions.indexOf(record.testedRevision) + 1;
+      state.revision = revisions.length;
+    }
+    state.revision++;
+    state.checks.response = false;
+    if (changedSite) state.checks.backup = state.checks.monitoring = false;
+    for (const flow of rolloutFlows) {
+      const affected = sharedChanged || (flow.rules ? flow.rules.some(effectiveChanged) : behaviorChanges.length > 0);
+      if (!affected) continue;
+      state.checks.journeys = false;
+      if (state.flows[flow.id].status !== 'pending') state.flows[flow.id].needsRetest = true;
+    }
+  }
   function createProject(id = 'static') {
     const scenario = catalog.scenarios.find(s => s.id === id);
     if (!scenario) throw new Error('找不到使用情境。');
-    return { version: 1, name: '我的 CSP 政策', origin: 'https://example.com', mode: 'report-only', reportingEndpoint: '', directives: clone(scenario.directives) };
+    return { version: 2, name: '我的 CSP 政策', origin: 'https://example.com', mode: 'report-only', reportingEndpoint: '', directives: clone(scenario.directives), rollout: createRollout() };
   }
   function parsePolicy(text) {
     if (typeof text !== 'string' || !text.trim()) throw new Error('請貼上單一 CSP 政策或完整 HTTP 標頭。');
@@ -60,13 +131,14 @@
     if (typeof text !== 'string' || text.length > 200000) throw new Error('專案檔超過 200 KB 或格式不正確。');
     let p;
     try { p = JSON.parse(text); } catch { throw new Error('JSON 格式不正確。'); }
-    if (!p || p.version !== 1 || !p.directives || typeof p.directives !== 'object' || Array.isArray(p.directives)) throw new Error('不是支援的 CSP 專案（version: 1）。');
+    if (!p || ![1, 2].includes(p.version) || !p.directives || typeof p.directives !== 'object' || Array.isArray(p.directives)) throw new Error('不是支援的 CSP 專案（version 1 或 2）。');
     if (p.mode !== 'enforce' && p.mode !== 'report-only') throw new Error('專案模式必須是 enforce 或 report-only。');
     for (const field of ['name', 'origin', 'reportingEndpoint']) if (typeof p[field] !== 'string' || controls.test(p[field]) || /[\r\n]/.test(p[field])) throw new Error(`專案欄位 ${field} 格式不正確。`);
     for (const [name, values] of Object.entries(p.directives)) {
       if (!namePattern.test(name) || reserved.has(name) || !Array.isArray(values) || values.some(v => typeof v !== 'string' || !v || /[\s;,]/.test(v) || controls.test(v))) throw new Error(`專案指令 ${name} 格式不正確。`);
     }
-    return { version: 1, name: p.name, origin: p.origin, mode: p.mode, reportingEndpoint: p.reportingEndpoint, directives: clone(p.directives) };
+    if (p.version === 2) validateRollout(p.rollout);
+    return { version: 2, name: p.name, origin: p.origin, mode: p.mode, reportingEndpoint: p.reportingEndpoint, directives: clone(p.directives), rollout: p.version === 1 ? createRollout() : clone(p.rollout) };
   }
   function exportProject(project) { return JSON.stringify(project, null, 2); }
   function effectiveDirective(directives, name) {
@@ -255,11 +327,47 @@
     if (status === 'allowed' && ['frame-ancestors', 'form-action', 'worker-src'].includes(type)) return done('unknown', '單一 URL 符合來源規則；完整祖先鏈、重新導向、Worker 同源條件等仍需瀏覽器驗證。');
     return done(status, reason);
   }
+  function proposeHash(directives, target, hash, strategy = 'preserve') {
+    const before = effectiveDirective(directives, target);
+    const previous = before.values || [];
+    const excluded = new Set(["'none'"]);
+    if (before.name !== target && target.startsWith('style-')) {
+      ["'strict-dynamic'", "'inline-speculation-rules'", "'wasm-unsafe-eval'"].forEach(value => excluded.add(value));
+    }
+    const retained = strategy === 'only' ? [] : previous.filter(value => !excluded.has(value.toLowerCase()));
+    const after = [...new Set([...retained, hash])];
+    const elementTarget = target.endsWith('-elem') ? target : target + '-elem';
+    const overridden = target !== elementTarget && own(directives, elementTarget);
+    const notes = [];
+    if (overridden) {
+      notes.push(`元素目前由 ${serializePolicy({ [elementTarget]: directives[elementTarget] })} 控制。請取消並改選 ${elementTarget}，才能將雜湊加入元素使用的指令。`);
+    }
+    if (!before.name) {
+      notes.push('這份政策原先未限制此類來源。新增指令後，只有符合新清單的內容才能通過這項檢查。');
+    } else if (before.name !== target) {
+      notes.push(`新增 ${target} 後會使用自己的來源清單。日後修改 ${before.name} 時，這份清單需要另外維護。`);
+      const skipped = previous.filter(value => value.toLowerCase() !== "'none'" && excluded.has(value.toLowerCase()));
+      if (strategy === 'preserve' && skipped.length) notes.push(`${skipped.join(' ')} 僅適用於腳本，已從新的樣式指令略過。`);
+    }
+    if (strategy === 'only' && previous.some(value => value !== hash && value.toLowerCase() !== "'none'")) {
+      notes.push('選擇只使用這筆雜湊後，原清單中的其他來源與權限都會從這項規則移除。');
+    }
+    const keywords = after.map(value => value.toLowerCase());
+    if (keywords.includes("'unsafe-inline'")) notes.push("加入雜湊後，現代瀏覽器會忽略此清單的 'unsafe-inline'。其他行內內容仍需各自符合適用的授權。");
+    if (target.startsWith('script-') && keywords.includes("'strict-dynamic'")) notes.push("支援 'strict-dynamic' 的瀏覽器會忽略一般腳本元素的網域、協定及 'self' 授權，並允許受信任腳本動態載入其他腳本。");
+    if (!overridden && target !== elementTarget) {
+      if (!own(directives, target + '-attr')) notes.push(`${target}-attr 未設定，屬性檢查也會使用這份清單。屬性內容需搭配 'unsafe-hashes' 才能用雜湊授權。`);
+      if (target === 'script-src' && !own(directives, 'worker-src') && !own(directives, 'child-src')) notes.push('Worker 的來源檢查也會回退至 script-src。');
+    }
+    const changed = JSON.stringify(previous) !== JSON.stringify(after);
+    if (!changed) notes.push('目前有效清單已包含這筆雜湊，無需套用。');
+    return { before, after, notes, canApply: changed && !overridden };
+  }
   async function hashSource(text, algorithm = 'SHA-256') {
     if (!['SHA-256', 'SHA-384', 'SHA-512'].includes(algorithm)) throw new Error('只支援 SHA-256、SHA-384 與 SHA-512。');
     if (!globalThis.crypto?.subtle) throw new Error('此環境不支援 Web Crypto；請以 HTTPS 或 localhost 開啟。');
     const hash = await globalThis.crypto.subtle.digest(algorithm, new TextEncoder().encode(text));
     return "'" + algorithm.toLowerCase().replace('-', '') + '-' + btoa(String.fromCharCode(...new Uint8Array(hash))) + "'";
   }
-  return { createProject, parsePolicy, serializePolicy, importProject, exportProject, effectiveDirective, validOrigin, validate, exportConfig, clone, simulate, hashSource };
+  return { createProject, parsePolicy, serializePolicy, importProject, exportProject, effectiveDirective, validOrigin, validate, exportConfig, clone, simulate, proposeHash, hashSource, rolloutFlows, updateRollout };
 });

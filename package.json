@@ -1,9 +1,14 @@
 {
   "name": "csp-workbench",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "private": true,
   "description": "CSP 政策工作台：建立、理解、驗證與重新編輯",
-  "scripts": { "test": "node --test tests/*.test.cjs", "dev": "node scripts/serve.cjs" },
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "test:browser": "playwright test",
+    "dev": "node scripts/serve.cjs"
+  },
+  "devDependencies": { "@playwright/test": "1.65.1" },
   "engines": { "node": ">=22" },
   "license": "GPL-3.0-only"
 }

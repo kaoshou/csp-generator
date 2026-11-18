@@ -28,7 +28,9 @@ test('multiline values work but controls and malformed directive names do not', 
 });
 test('JSON project round trip preserves mode origin reporting and unknown directives', () => {
   const p = { version: 1, name: '測試', origin: 'https://app.example', mode: 'report-only', reportingEndpoint: 'https://reports.example/csp', directives: { sandbox: [], 'x-future': ['alpha'] } };
-  assert.deepEqual(c.importProject(c.exportProject(p)), p);
+  const imported = c.importProject(c.exportProject(p));
+  assert.deepEqual(imported, { ...p, version: 2, rollout: c.createProject().rollout });
+  assert.deepEqual(c.importProject(c.exportProject(imported)), imported);
 });
 test('malformed and prototype-bearing project data are rejected', () => {
   for (const raw of ['{"version":2}', '{"version":1,"directives":[]}', '{"version":1,"directives":{"__proto__":[]}}', '{"version":1,"directives":{"img-src":"https:"}}']) {
